@@ -96,15 +96,21 @@ nsis:
 #   留着它的危害：`nsis-web` 已不在 target 列表里，这个块是**静默的孤儿配置**
 #   （app-builder-lib 认得这个键，所以不会报错），但会让下一个人以为
 #   联网包还在产出，从而去别处找 `dist/nsis-web` 的产物。
-# 发布地址：GitHub Releases（2026-10-08 换源，旧域名 astriax.huanyan.fun 已废弃）
+# 联网安装版（nsis-web）本体下载地址 —— 装的时候真实去这里拉 .7z。
 #
-# ★ 这是**独立于 publish-urls.ts 的第二处地址** —— 换服务器/换源时最容易漏。
-#   漏了的话新用户跑联网安装器会去一台已经下线的机器拉本体，而且
-#   nsis-web 是单 URL、没有回落，表现为"安装器打开了但装不上"。
-#   （本项目现在只发全量包，所以这里主要影响 electron-updater 的元数据，
-#     但保持两处一致仍是硬要求。）
+# ★ 2026-09-15：服务器换成 8.216.54.25（唯一一台，老两台已下线）。
+#   审计专门点过这条：它是**独立于 publish-urls.ts 的第二处地址**，
+#   换服务器时最容易漏 —— 漏了的话新用户跑联网安装器会去一台已经
+#   下线的机器拉本体，而且 nsis-web 是**单 URL、没有回落**，
+#   表现为"安装器打开了但装不上"。
 #
-# 与 src/main/update/publish-urls.ts 的 GITHUB_* 常量必须指向同一个仓库。
+# 目录名 mxbot/ 保持不变 —— 它是服务器上的路径，也是已发布客户端里
+# 写死的清单地址（publish-urls.ts 的 MX_OFFICIAL_BASE）。改目录名会让
+# **所有已装出去的旧版本**再也找不到更新。
+#
+# 两处地址必须一起改：这里 + src/main/update/publish-urls.ts。
+# （scripts/audit-sync-calls.cjs 同级的 self-check 会检查 ipc 侧注入，
+#   这条 URL 目前靠人工同步 —— 已在 decisions.log 记为本轮教训。）
 publish:
   provider: generic
-  url: https://github.com/Huan-Yan123/AstriaX/releases/latest/download/
+  url: https://astriax.huanyan.fun/mxbot/

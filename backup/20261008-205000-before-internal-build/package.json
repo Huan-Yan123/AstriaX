@@ -14,7 +14,6 @@
     "test:watch": "vitest",
     "dist": "electron-vite build && electron-builder",
     "dist:both": "node scripts/build-both-versions.cjs",
-    "dist:3": "node scripts/build-three.cjs",
     "publish:gh": "node scripts/publish-github.cjs"
   },
   "devDependencies": {

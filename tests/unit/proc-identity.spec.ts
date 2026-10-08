@@ -106,9 +106,57 @@ describe('★★按端口补杀的身份校验', () => {
       ).toBe(false)
     })
 
-    it('★绑对外的端口 → 不杀（无论启动时间）', () => {
+    it('★★绑对外端口 + 是 QQ → **可以杀**（OneBot 端口本来就对外）', () => {
+      /*
+       * ══════════════════════════════════════════════════════════════════
+       * 主人 2026-10-08 实测暴露：这条原先断言"对外就不杀"，是错的
+       * ══════════════════════════════════════════════════════════════════
+       *
+       * 现场（日志实据）：
+       *   删除实例：端口 6200 被 pid 26324 占用，但**证据不足**
+       *            （不是回环监听 ✘）—— 这次不动它。它是 E:\QQ\QQ.exe
+       *
+       * netstat 实测：`0.0.0.0:6200 LISTENING` —— NapCat 在实例端口上
+       * 开的是 **OneBot 端口**，**本来就该对外**（机器人框架要连它）。
+       * 旧判据要求"必须回环"，于是对最常见的 NapCat 场景**恒为假**，
+       * 结果实例永远停不掉、删不掉。
+       *
+       * 现在：对外监听时用**进程名**补鉴别力 —— 是 QQ 就认。
+       */
+      const info: ProcInfo = {
+        pid: 26324,
+        exePath: 'E:\\QQ\\QQ.exe',
+        createdAt: startedAt + 500
+      }
+      expect(
+        shouldKillByPort(info, { sinceMs: startedAt, loopbackOnly: false }),
+        '★NapCat 注入的 QQ 在 OneBot 端口上是对外监听的，必须认得出 ——\n' +
+          '否则这个实例永远删不掉、停不掉（主人实测就是这个现象）'
+      ).toBe(true)
+    })
+
+    it('★★绑对外端口 + **不是** QQ → 不杀（别人的服务）', () => {
+      /*
+       * 这是上一条的对照，也是"补鉴别力"的那一刀：
+       * 用户完全可能在 6200 上跑别的对外服务，那不是我们的，绝不能杀。
+       */
+      const info: ProcInfo = {
+        pid: 9999,
+        exePath: 'C:\\MyServer\\server.exe',
+        createdAt: startedAt + 500
+      }
+      expect(
+        shouldKillByPort(info, { sinceMs: startedAt, loopbackOnly: false }),
+        '对外监听 + 不是 QQ → 不杀。用户自己的服务不能被误杀'
+      ).toBe(false)
+    })
+
+    it('★绑对外 + 查不到 exePath → 不杀（保守）', () => {
       const info: ProcInfo = { pid: 28704, createdAt: startedAt + 500 }
-      expect(shouldKillByPort(info, { sinceMs: startedAt, loopbackOnly: false })).toBe(false)
+      expect(
+        shouldKillByPort(info, { sinceMs: startedAt, loopbackOnly: false }),
+        '拿不到进程路径就无法确认是 QQ —— 不杀'
+      ).toBe(false)
     })
 
     it('★★读不到启动时间 → **不杀**（保守）', () => {

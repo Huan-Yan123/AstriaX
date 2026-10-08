@@ -28,8 +28,19 @@ export interface DownloadDeps {
   /** 直接给一串候选地址（内置 Python 这类非 GitHub 资源用），按顺序试 */
   sources?: string[]
   fetchBuf?: (url: string, onProgress?: (got: number, total?: number) => void) => Promise<Buffer>
-  /** 流式下载到文件（真实路径默认用它，边下边写盘+增量哈希，内存恒定） */
-  fetchToFile?: (url: string, dest: string, onProgress?: (got: number, total?: number) => void) => Promise<{ sha256: string; bytes: number }>
+  /**
+   * 流式下载到文件（真实路径默认用它，边下边写盘+增量哈希，内存恒定）。
+   *
+   * 第 4 个参数是**取消信号**（主人 2026-10-08）：`downloadRuntime` 会
+   * 把 `signal` 一路传到这里，让**正在进行的那次传输**能被中断。
+   * 注入自定义实现的测试可以忽略它（多一个参数不影响既有签名）。
+   */
+  fetchToFile?: (
+    url: string,
+    dest: string,
+    onProgress?: (got: number, total?: number) => void,
+    signal?: AbortSignal
+  ) => Promise<{ sha256: string; bytes: number }>
   fetchJson?: (url: string) => Promise<string>
   onProgress?: (got: number, total?: number) => void
   /** 下载完成后的阶段通知（校验中 / 落盘中），避免界面停在 100% 像卡死 */
@@ -73,11 +84,50 @@ async function defaultFetchJson(url: string): Promise<string> {
 export async function defaultFetchToFile(
   url: string,
   dest: string,
-  onProgress?: (got: number, total?: number) => void
+  onProgress?: (got: number, total?: number) => void,
+  /**
+   * ★ 外部取消信号（主人 2026-10-08：「取消了，延迟性巨大」）
+   *
+   * ══════════════════════════════════════════════════════════════════════
+   * 这里原来**完全不接受**外部信号，是"取消要等 93 秒"的根因
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * 日志实据（用户提供的 app 日志）：
+   *   [ERROR] [perf] IPC python:install 耗时 93389ms（严重）
+   *
+   * ## 原来的代码
+   *
+   *     const ctrl = new AbortController()                        ← 自建
+   *     const timer = setTimeout(() => ctrl.abort(), 30*60*1000)  ← 30 分钟
+   *     const r = await fetch(url, { signal: ctrl.signal })       ← 用自建的
+   *
+   * 于是用户点取消时：上层 `pySignal` 确实被 abort 了、
+   * `fetchToFileWithRetry` 也确实在循环里检查了 —— 但**正在进行的那次
+   * HTTP 请求根本不知道**，它会一直下到 30 分钟超时，或者下完整个包为止。
+   *
+   * Python embed 包约 11MB，用户机器上那次卡了 93 秒 —— 正好是
+   * "取消信号发出去、但下载还在跑"的典型时长。
+   *
+   * ## 现在
+   *
+   * 外部信号与内部超时**任一**都能中断：用 `AbortSignal.any` 合并
+   *（Node 20+ 内置）。这样既不丢掉"下载卡死"的 30 分钟保护，
+   * 又能让取消立刻生效。
+   */
+  signal?: AbortSignal
 ): Promise<{ sha256: string; bytes: number }> {
   const { createWriteStream } = await import('fs')
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 30 * 60 * 1000)
+  /* 外部取消也要能中断这次 fetch —— 见上面那段说明 */
+  const onOuterAbort = (): void => ctrl.abort()
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(timer)
+      throw new Error('下载已取消')
+    }
+    signal.addEventListener('abort', onOuterAbort, { once: true })
+  }
   try {
     const r = await fetch(url, { signal: ctrl.signal })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -174,6 +224,8 @@ export async function defaultFetchToFile(
     return { sha256: hash.digest('hex'), bytes: got }
   } finally {
     clearTimeout(timer)
+    /* 摘掉外部监听，否则长会话里会越挂越多（与 async-exec 同一套卫生习惯） */
+    signal?.removeEventListener('abort', onOuterAbort)
   }
 }
 
@@ -218,7 +270,15 @@ async function fetchToFileWithRetry(
      */
     if (signal?.aborted) throw new Error('下载已取消')
     try {
-      return await fetchToFile(url, dest, onProgress)
+      /*
+       * ★ 第 4 个参数是取消信号 —— 必须传下去（主人 2026-10-08）
+       *
+       * 上面那句 `if (signal?.aborted)` 只管"**下一次**要不要再试"，
+       * 而**正在进行的那次请求**要靠 `fetchToFile` 自己接住信号。
+       * `defaultFetchToFile` 现在支持这个参数了（见它的说明），
+       * 但**这里不传的话就等于没接** —— 取消照样要等下载自然结束。
+       */
+      return await fetchToFile(url, dest, onProgress, signal)
     } catch (e) {
       lastErr = e
       /* 取消导致的失败不该重试（重试也只会立刻再失败一次） */
@@ -261,16 +321,48 @@ export async function downloadRuntime(deps: DownloadDeps): Promise<DownloadResul
   const fetchWithRetry: typeof fetchToFile =
     deps.fetchToFile
       ? fetchOnce
-      : (url, dest, onProgress) => fetchToFileWithRetry(fetchOnce, url, dest, onProgress, 3, deps.signal)
+      : /*
+         * ★ 必须把 `deps.signal` 继续往下传（主人 2026-10-08）
+         *
+         * 传进 `fetchToFileWithRetry` 只解决了"不要在取消后**再**发起
+         * 新请求"，而**正在进行的那次**要靠 `defaultFetchToFile` 自己
+         * 接住信号才能中断 —— 它原来压根不接收这个参数。
+         * 两个环节都接上，取消才是真的立刻生效。
+         */
+        (url, dest, onProgress) =>
+          fetchToFileWithRetry(fetchOnce, url, dest, onProgress, 3, deps.signal)
   const dir = dirname(deps.destFile)
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+
+  /**
+   * 「这次下载被取消了吗」—— `isCancelled` 与 `signal` 的**统一判据**。
+   *
+   * ══════════════════════════════════════════════════════════════════════
+   * ★★ 为什么必须两个都查（主人 2026-10-08 两次实测才修全）
+   * ══════════════════════════════════════════════════════════════════════
+   *
+   * 这两者是**两代**取消机制，而不同调用方传的不是同一个：
+   *   · `python:install`  → 只传 `signal`
+   *   · `runtime:install` → 只传 `signal`（早期实现只认 isCancelled）
+   *
+   * 原来的代码在**几处**只查了 `isCancelled`，于是对那些只传 signal 的
+   * 调用方来说，取消形同不存在 —— 循环会把剩下的源全试一遍。
+   *
+   * 抽成一个函数而不是各处手写 `a?.() || b?.aborted`：那正是漏掉的原因
+   *（同一个判据在文件里写了三遍，修的时候只改到一处）。
+   */
+  const isAborted = (): boolean => Boolean(deps.signal?.aborted) || Boolean(deps.isCancelled?.())
   const tmp = `${deps.destFile}.part`
 
   // 直接给地址列表（内置 Python 这类）：逐个试，不参与镜像解析
   if (deps.sources?.length) {
     let lastErr: unknown
     for (const url of deps.sources) {
-      if (deps.isCancelled?.()) throw new Error('下载已取消')
+      /*
+       * 统一判据（见 isAborted 的说明）：`python:install` 只传 signal，
+       * 而这里原来只查 isCancelled —— 所以取消后它照样把剩下的源试完。
+       */
+      if (isAborted()) throw new Error('下载已取消')
       try {
         rmSync(tmp, { force: true })
         const r = await fetchWithRetry(url, tmp, deps.onProgress)
@@ -283,6 +375,8 @@ export async function downloadRuntime(deps: DownloadDeps): Promise<DownloadResul
         return { ok: true, usedBase: url, usedLabel: new URL(url).host, sha256: r.sha256, bytes: r.bytes }
       } catch (e) {
         lastErr = e
+        /* 取消导致的失败立刻上抛，不再试下一个地址（理由同镜像循环） */
+        if (isAborted()) throw new Error('下载已取消')
       }
     }
     throw new Error(`下载失败：${deps.sources.length} 个地址都没成。最后错误：${String(lastErr)}`)
@@ -298,7 +392,14 @@ export async function downloadRuntime(deps: DownloadDeps): Promise<DownloadResul
   let lastErr: unknown
 
   for (const m of candidates) {
-    if (deps.isCancelled?.()) throw new Error('下载已取消')
+    /*
+     * ★ 取消判据要看**两个**（与 sources 分支同样的理由）
+     *
+     * 原来只查 `deps.isCancelled?.()`，而 `runtime:install` 只传 `signal`。
+     * 于是取消后这里会把剩下的镜像**全试一遍**（每个都要等超时），
+     * 用户看到的就是"点了取消，界面还在一个个试源"。
+     */
+    if (isAborted()) throw new Error('下载已取消')
     let url: string
     let expectSha = deps.release.sha256
     try {
@@ -324,7 +425,23 @@ export async function downloadRuntime(deps: DownloadDeps): Promise<DownloadResul
 
       // 流式写盘：内存恒定，适合 100MB+ 的运行时包
       rmSync(tmp, { force: true })
-      const r = await fetchToFile(url, tmp, deps.onProgress)
+      /*
+       * ★ 必须把取消信号传下去（主人 2026-10-08：「napcat 和 astrbot
+       *   依旧取消不了」）
+       *
+       * 这一行原来漏了第 4 个参数 —— 于是**镜像路径**（NapCat/AstrBot
+       * 走的就是这条）的下载完全无法中断：
+       *   · 用户点取消 → controller.abort() → 但正在传输的 fetch 不知道
+       *   · 只能等它自然下完（NapCat 包 28MB，慢源上要几分钟）
+       *
+       * 这与我先前在 `sources` 分支（内置 Python）修的是**同一个 bug**，
+       * 但当时只改了那一条路，没意识到镜像路径是另一份独立调用 ——
+       * 所以 python 能取消了，NapCat/AstrBot 依旧不能。
+       *
+       * 教训：同一个概念（取消）在文件里有多条并行的调用路径时，
+       * 必须**全部**接上；改一条就以为修好了，是最容易犯的错。
+       */
+      const r = await fetchToFile(url, tmp, deps.onProgress, deps.signal)
       // 下载到 100% 之后还要算哈希、落盘：大包这一步要几秒，
       // 不通知的话界面就停在 100% 像卡死了，所以补一个「校验中」的进度。
       deps.onPhase?.({
@@ -347,6 +464,13 @@ export async function downloadRuntime(deps: DownloadDeps): Promise<DownloadResul
     } catch (e) {
       lastErr = e
       deps.onSourceTried?.(m, false, String(e instanceof Error ? e.message : e))
+      /*
+       * 取消导致的失败**立刻上抛**，不再试下一个镜像。
+       *
+       * 不这样做的后果：用户点完取消，还得等剩下的源一个个超时 ——
+       * 界面看着像"取消了没反应"，而实际是在空转。
+       */
+      if (isAborted()) throw new Error('下载已取消')
     }
   }
 

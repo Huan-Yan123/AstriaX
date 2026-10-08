@@ -39,7 +39,27 @@ import type { PythonSource } from './python-source'
  */
 import { isDiskBusy } from '../util/workdir'
 
-export type PySourceStatus = 'ok' | 'unreachable'
+/**
+ * 探测结果的三档状态。
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★★ 为什么要有 `empty`（独立复核抓出的语义不一致，主人 2026-10-08）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * 原来是两档：`ok | unreachable`，而"连得上、但索引页是空的"被塞进了
+ * `unreachable`（见下面那个 `if (!body.trim())` 分支）。
+ *
+ * 那是**归错了桶**：它明明连得上（HTTP 200），"不可达"这个词会误导
+ * 排查方向（去看网络/防火墙），而真实原因是**源上没有这个包**。
+ *
+ * 更重要的是与 GitHub 源那边**语义不一致** ——
+ * `mirror-store-test.ts` 早就区分了 `ok | empty | unreachable`。
+ * 两边不一致的直接后果：渲染层的上锁判据要写两套，
+ * 而实际就漏了一处（见 DownloadPage 里 isSourceDown 的说明）。
+ *
+ * `empty` 的含义统一为：**服务是活的，但它这儿没货**（下不到东西）。
+ */
+export type PySourceStatus = 'ok' | 'empty' | 'unreachable'
 
 export interface PySourceTestResult {
   /** 源的标识（用 indexUrl，渲染层据此对上号） */
@@ -122,14 +142,18 @@ export async function testPythonSources(deps: {
         /*
          * 通了也要看"有没有货"：一个返回 200 的空页面等于没这个包
          *（和 GitHub 源那条"能连上≠能用"是同一个教训）。
+         *
+         * ★ 归 `empty` 而不是 `unreachable`：服务是活的，只是没货。
+         *   两者对用户的含义完全不同 —— "不可达"让人去查网络，
+         *   而真相是这个源上没有 astrbot，换个源就行。
          */
         if (!body.trim()) {
           return {
             indexUrl: s.indexUrl,
             label: s.label,
             ms: null,
-            status: 'unreachable',
-            reason: '页面是空的'
+            status: 'empty',
+            reason: '这个源上没有 AstrBot（索引页是空的）'
           }
         }
         return {

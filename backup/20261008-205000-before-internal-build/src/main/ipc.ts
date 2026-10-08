@@ -45,7 +45,6 @@ import type { Logger } from './logs/logger'
 import type { AuditLog } from './logs/audit'
 
 import { resetCredentials, scanCredentials } from './creds/creds'
-import { isInternalBuild } from './hardware-override'
 
 import { relocateDataRoot } from './store/relocate'
 
@@ -612,17 +611,6 @@ export interface HandlerOpts {
     freeMemMB: number
     totalDiskMB: number
     freeDiskMB: number
-    /*
-     * 下面三个是**可选**的：早期调用方（和多数测试注入的假实现）
-     * 只给内存/磁盘。渲染层用 `sys?.cpuModel` 这样读，缺了就是
-     * "未检测到"，不会崩。
-     *
-     * `gpuModel` 尤其重要 —— 它本来就没在这个类型里，于是内部定制版
-     * 无法通过类型检查把它传出去（而渲染层的 cleanGpu 一直在读它）。
-     */
-    osVersion?: string
-    cpuModel?: string
-    gpuModel?: string
   }>
   /**
  * M2 日志系统：操作/崩溃日志 + 导出 zip（未注入时 logs:export 报错而非崩）
@@ -5895,31 +5883,8 @@ function astrbotDepsLookInstalled(runtimeDir: string): boolean {
     return false
   }}/**
  * 真实系统信息：内存余量 + 数据根所在盘余量（MB）
- *
- * ★ 内部定制版会在**入口处**换成固定硬件（见 hardware-override.ts）。
- *   公开版构建时 `isInternalBuild()` 恒为 false，整段被 tree-shaking 删除。
  */
 async function realSystemInfo() {
-  /*
-   * ── 内部定制版：直接返回固定硬件，不读真实机器 ──
-   *
-   * 放在函数**最前面**（而不是最后覆盖字段）：这样连 statfs
-   * 都不必跑 —— 内部版的磁盘/内存都不该反映宿主机。
-   */
-  if (isInternalBuild()) {
-    const { INTERNAL_HW, internalUsedMemMB } = await import('./hardware-override')
-    const used = internalUsedMemMB()
-    return {
-      totalMemMB: INTERNAL_HW.totalMemMB,
-      freeMemMB: INTERNAL_HW.totalMemMB - used,
-      totalDiskMB: 4 * 1024 * 1024,
-      freeDiskMB: 2 * 1024 * 1024,
-      osVersion: os.release(),
-      cpuModel: INTERNAL_HW.cpuModel,
-      gpuModel: INTERNAL_HW.gpuModel
-    }
-  }
-
   const { promises: fsp } = await import('fs')
   const total = Math.floor(os.totalmem() / (1024 * 1024))
   const free = Math.floor(os.freemem() / (1024 * 1024))

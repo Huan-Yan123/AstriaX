@@ -312,6 +312,17 @@ function pick(k: 'log' | 'reset' | 'del' | 'version' | 'update'): void {
   min-width: 0;
   display: grid;
   grid-template-columns: minmax(180px, 1fr) auto;
+  /*
+   * ★ 两列之间**必须有间距**（之前完全没有）。
+   *
+   * 原来只有 `align-items: center`，没有 gap —— 于是第一列的内容
+   *（名字/徽章/版本）一旦顶到列的右边缘，就会**紧贴**第二列的按钮，
+   * 中间连一个像素都不留。截图里版本号几乎粘在「启动」上就是这个原因。
+   *
+   * 22px 是让"信息区"和"操作区"在视觉上分开一档的最小值：
+   * 再小仍然像连在一起，再大在窄屏上会把信息区压得太紧。
+   */
+  column-gap: 22px;
   align-items: center;
   transition: background 0.14s ease;
 }
@@ -322,17 +333,53 @@ header {
   display: flex;
   align-items: center;
   gap: 10px;
+  /*
+   * ★ header 自己**不伸缩**（`justify-self: start` + 让内容决定宽度）。
+   *
+   * 这是"版本号贴到按钮上"的真正原因：header 是 grid 第一列
+   *（`minmax(180px, 1fr)`），在宽屏上这一列会被拉得很宽；
+   * 而 header 默认 `justify-self: stretch`，于是它的盒子占满整列，
+   * 内部又有个 `flex:1` 的名字在吃剩余空间 —— 徽章和版本就被顶到
+   * **列的右边缘**，那里紧挨着「启动」按钮。
+   *
+   * 改成 `justify-self: start`：header 只占内容需要的宽度，
+   * 于是"名字 徽章 版本"三件挨在一起（左对齐），
+   * 与右侧按钮之间留出的是**列宽剩余的自然空白**。
+   */
+  justify-self: start;
+  /* 名字很长时不要把按钮挤走：给 header 一个上限 */
+  max-width: 100%;
+  min-width: 0;
 }
 h3 {
   margin: 0;
   font-size: 15.5px;
-  /* 名字太长时省略，别把右边的类型徽章和版本标挤出去 */
+  /*
+   * ★ 名字**不再吃剩余空间**（`flex: 0 1 auto`）。
+   *
+   * 早先写成 `flex: 1 1 auto`（"唯一可伸缩项"）—— 那个思路用于
+   * "名字要在固定宽度里省略"，但副作用是**它会把徽章和版本顶到右边缘**。
+   * 现在 header 已经不伸缩了，名字只需"太长时能收缩"：
+   * 允许收缩（`flex-shrink: 1`）、不允许增长（`flex-grow: 0`）。
+   *
+   * `min-width: 0` 仍是省略号生效的前提（flex item 默认 min-width:auto）。
+   */
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .badge {
+  /*
+   * `flex: none` —— 与 `.ver` 一样不可伸缩。
+   *
+   * 名字那一项是可伸缩的（见 h3），它会把剩余空间吃光；
+   * 但**只有**明确 `flex: none` 的项才保证不被压缩 ——
+   * flex item 默认是 `flex: 0 1 auto`（允许收缩），
+   * 于是名字很长时徽章会被压扁（文字换行/溢出）。
+   */
+  flex: none;
   border-radius: 999px;
   padding: 2px 10px;
   font-size: 11px;
@@ -340,12 +387,31 @@ h3 {
   color: var(--primary-deep);
 }
 /*
-  版本标：贴在类型徽章右边，等宽字体会让版本号读起来更整齐。
-  用最轻的底色 + 灰字，不跟类型徽章抢注意力（版本是参考信息，不是操作入口）。
-  靠 margin-left:auto 推到最右侧，标题再长也不会把它挤掉。
-*/
+ * 版本标：跟在**类型徽章**后面（而不是推到 header 最右侧）。
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★ 为什么改（主人 2026-10-08 截图反馈：「版本显示的位置怪怪的」）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * 原来这里有 `margin-left: auto`，把版本推到了 header 的最右端 ——
+ * 而 header 只是 grid 的第一列，它的右边缘**紧挨着「启动/停止」按钮**。
+ *
+ * 于是视觉上：
+ *
+ *     NapCat 实例    [NapCat]              v4.18.33   [启动] [WebUI]
+ *     ↑ 名字与徽章                     ↑ 飘在这  ↑ 按钮
+ *
+ * 那枚版本号孤零零贴在按钮左边，读起来像按钮的附属标签
+ *（"启动 v4.18.33"？），而不是"这个实例跑的是哪个版本"。
+ *
+ * 现在它紧跟在类型徽章后面，和名字、类型连成一组：
+ *
+ *     NapCat 实例    [NapCat] [v4.18.33]            [启动] [WebUI]
+ *
+ * 语义上也更对：**版本是对这个实例的补充说明**，不是与操作有关的东西，
+ * 所以它该挨着"这是什么实例"那一组，而不是挨着"能对它做什么"那一组。
+ */
 .ver {
-  margin-left: auto;
   flex: none;
   font: 11px/1 'JetBrains Mono', Consolas, monospace;
   color: var(--ink-soft);

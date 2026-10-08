@@ -5,6 +5,28 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+/**
+ * 问题反馈群 + 附在求助弹窗末尾的一行。
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★ 提到**模块作用域**（主人 2026-10-08）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * 原来 `notify()` 和 `choose()` **各自**在函数体里写了一遍
+ * `const FEEDBACK_QQ = '2250713669'` —— 同一份数据抄两遍。
+ * 这正是"改一处漏一处"的经典土壤：主人要求去掉个人 QQ 时，
+ * 必须先在两处都找到它们才敢改（我这次就是搜 `2250713669` 才找全的）。
+ *
+ * 现在一份定义、两处引用。与 `App.vue` 的 `FEEDBACK_LINE`
+ * 是同一个号（渲染层没有跨文件共享常量的地方，所以各写一份），
+ * 测试会校验它们一致。
+ *
+ * 文案（为什么不是"加我 QQ"）：换成群之后，"找我"这个主语就不成立了 ——
+ * 群里是互相帮忙，且可能有人已经遇到过。所以写成"去群里问"。
+ */
+const OFFICIAL_GROUP = '1077554004'
+const FEEDBACK_LINE = `\n\n—— 搞不定的话去群里问：${OFFICIAL_GROUP}（问题反馈群）`
+
 export interface DialogButton {
   text: string
   kind: 'main' | 'ghost' | 'danger'
@@ -44,9 +66,6 @@ export const useDialogStore = defineStore('dialog', () => {
    * 简单通知
    */
   function notify(title: string, body?: string, opts?: { feedback?: boolean }): void {
-    const FEEDBACK_QQ = '2250713669'
-    const FEEDBACK_LINE = `\n\n—— 搞不定的话加我 QQ：${FEEDBACK_QQ}（问题反馈QQ）`
-
     showDialog({
       title,
       body: opts?.feedback ? `${body ?? ''}${FEEDBACK_LINE}` : body,
@@ -85,11 +104,8 @@ export const useDialogStore = defineStore('dialog', () => {
     yes: string,
     no: string,
     opts?: { feedback?: boolean }
-  ): Promise<boolean> {
-    const FEEDBACK_QQ = '2250713669'
-    const FEEDBACK_LINE = `\n\n—— 搞不定的话加我 QQ：${FEEDBACK_QQ}（问题反馈QQ）`
-
-    return new Promise((resolve) => {
+  ) {
+    return new Promise<boolean>((resolve) => {
       showDialog({
         title,
         body: opts?.feedback ? `${body}${FEEDBACK_LINE}` : body,
