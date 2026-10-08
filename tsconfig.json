@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": { "@main/*": ["src/main/*"], "@renderer/*": ["src/renderer/src/*"] },
+    "noEmit": true
+  },
+  "include": ["src", "tests", "electron.vite.config.ts"]
+}

@@ -1,0 +1,110 @@
+appId: mx.launcher
+# ── 展示名（用户看到的）改成 AstriaX ──────────────────────────────────
+productName: AstriaX
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+extraResources:
+  # 托盘 / 窗口图标。
+  #
+  # 【为什么放 extraResources 而不是 files】
+  # 用户报告「托盘还是没图标」。
+  #
+  # `files` 里的东西会被打进 **app.asar**（一个归档包），而 Electron 的
+  # `nativeImage.createFromPath()` **读不了 asar 内部的文件** ——
+  # 路径能 existsSync 出来，但 createFromPath 返回 empty image，
+  # 于是托盘掉到兜底色块，看起来就是「没有图标」。
+  #
+  # 开发态看着正常，是因为那时直接读工程的 build\icon.png ——
+  # 典型的「本地好好的，装完就坏了」。
+  #
+  # extraResources 把文件复制到 <安装目录>\resources\ 下（asar 外面），
+  # 运行时用 process.resourcesPath 就能拿到真实文件。
+  # 对应 src/main/tray/tray.ts 的 loadIconImage 和 src/main/index.ts 的 winIcon。
+  - from: build/icon.png
+    to: icon.png
+win:
+  # 程序自身 / 安装包的图标（exe 文件图标、任务栏）
+  icon: build/icon.png
+  # ══════════════════════════════════════════════════════════════════════
+  # 不设 executableName —— 刻意让 exe 和安装目录都叫 AstriaX
+  # ══════════════════════════════════════════════════════════════════════
+  #
+  # 背景：app-builder-lib/out/appInfo.js:56-57 里
+  #     this.productFilename = executableName != null ? sanitize(executableName)
+  #                                                     : this.sanitizedProductName
+  # 而决定**安装目录名**的 APP_FILENAME 取自 productFilename
+  # （NsisTarget.js:156 → targetUtil.js:41）。
+  #
+  # 也就是说：一旦把展示名改成 AstriaX，安装目录会跟着变成 AstriaX。
+  # 实测（scripts/_probe-rename-installdir.cjs）：
+  #     旧名 MXBot  从 E:\MXBot 装 → E:\MXBot        （原地）
+  #     新名 AstriaX 从 E:\MXBot 装 → E:\MXBot\AstriaX（另起子目录）
+  #
+  # 一度打算把 executableName 钉死成 MXBot 来"原地更新、保住老数据"，
+  # 但主人明确说：**旧版自己手动删掉，不需要适配**。
+  # 所以这里不留兼容层 —— 这就是 AstriaX 的第一版，全新身份：
+  #     exe        → AstriaX.exe
+  #     安装目录   → AstriaX
+  #     数据目录   → <安装目录>\data（全新生成）
+  #
+  # appId 仍保持 mx.launcher 不动：它决定 APP_GUID，
+  # 而注册表里的安装位置/卸载项都挂在它下面。既然是全新第一版，
+  # 保持它可以让**从这一版往后**的所有更新都认得出彼此。
+  target:
+    - target: nsis # 全量安装包：程序完整内置，安装后即用（绿色感=数据同目录）
+  # ★ 2026-09-24：**去掉 nsis-web（联网安装版）**，只发全量包（主人要求）
+  #
+  # 理由（主人原话）：「现在只做全量包，web安装包不搞了」。
+  #
+  # 技术支持上也是对的：nsis-web 是**单 URL、没有回落**的联网安装器，
+  # 服务器一换域名/端口就全员装不上（下面 publish.url 的注释记过这个坑）；
+  # 而全量包 80MB 自带一切，不怕源站抖动。
+  # 代价只是包大一点 —— 而下载本来就是走我们自己的源，可控。
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  include: build/installer.nsh
+  artifactName: AstriaX-Setup-${version}.${ext}
+  uninstallDisplayName: AstriaX 卸载
+  shortcutName: AstriaX
+  # ── 安装 / 卸载向导的界面 ────────────────────────────────────────────
+  #
+  # 主人先要求「界面也要改成软件风格」，试做之后又说
+  # 「那就只改文案，不改图标和样式吧」—— 所以这里**不设**任何向导图。
+  #
+  # 之前设过 installerSidebar / uninstallerSidebar / installerHeader，
+  # 那会把欢迎页左侧换成我们生成的深蓝渐变图；现在去掉，回到 NSIS 默认。
+  #
+  # 保留的只有**文案**（build/installer.nsh 的 customWelcomePage
+  # 与 customFinishPage 里的标题文字），以及卸载器的「数据处置」页
+  # —— 那一页是主人要的**功能**（默认保留数据 / 可一起删除 / 可取消卸载），
+  # 不是样式，所以留着。
+  #
+  # 那三张 BMP 仍留在 build/ 下（installerSidebar.bmp 等），
+  # 由 scripts/_make-installer-art.cjs 生成 —— 留着是为了以后想用时
+  # 不必重跑生成脚本；它们不参与打包，不影响产物大小。
+  #
+  # installerIcon / uninstallerIcon 也**刻意不设**：
+  # 默认值走 packager.getIconPath()，会把 win.icon(build/icon.png)
+  # 自动转成 .ico。NSIS 的 Icon 命令只吃 .ico，直接塞 png 会失败。
+#
+# ★ 原来这里还有一个 `nsisWeb:` 块（installerIcon / artifactName）——
+#   已随"只发全量包"的决定一起删除。
+#   留着它的危害：`nsis-web` 已不在 target 列表里，这个块是**静默的孤儿配置**
+#   （app-builder-lib 认得这个键，所以不会报错），但会让下一个人以为
+#   联网包还在产出，从而去别处找 `dist/nsis-web` 的产物。
+# 发布地址：GitHub Releases（2026-10-08 换源，旧域名 astriax.huanyan.fun 已废弃）
+#
+# ★ 这是**独立于 publish-urls.ts 的第二处地址** —— 换服务器/换源时最容易漏。
+#   漏了的话新用户跑联网安装器会去一台已经下线的机器拉本体，而且
+#   nsis-web 是单 URL、没有回落，表现为"安装器打开了但装不上"。
+#   （本项目现在只发全量包，所以这里主要影响 electron-updater 的元数据，
+#     但保持两处一致仍是硬要求。）
+#
+# 与 src/main/update/publish-urls.ts 的 GITHUB_* 常量必须指向同一个仓库。
+publish:
+  provider: generic
+  url: https://github.com/Huan-Yan123/AstriaX/releases/latest/download/
