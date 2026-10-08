@@ -1,0 +1,8 @@
+{
+  "version": "1.0.1",
+  "url": "AstriaX-Setup-1.0.1.exe",
+  "sha256": "786a26ac01873a929a72703ca25ba4e88be3ae8c777dc88ca93874c982dd75ff",
+  "size": 85959211,
+  "releasedAt": "2026-10-08T16:17:29.549Z",
+  "notes": "修复：点「下载更新」报 HTTP 404\n  安装包地址被解析成了仓库根目录（安装包其实在 Releases）。\n  现在从清单取文件名重新拼 Releases 地址，并并发测速选最快的源。\n修复：中文路径下检测不到 QQ（子进程输出按 UTF-8 解，而 Windows 原生命令输出 GBK）\n新增：资源页「安装 pip 库」\n修复：资源页分区序号错乱"
+}

@@ -1,0 +1,17 @@
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+data/
+templates/
+release/
+# 编辑器写入残留的原子临时目录
+**/.*.tmpdir/
+*.tmp
+data-test/
+# 临时目录：里面是测试用的 Python 环境（含 100MB+ 的 DLL），不进仓库
+tmp/
+# 改动前的本地备份（主人要求"先备份再改"时生成的），属于工作过程
+# 产物、不是源码 —— 它们只是同一批文件的历史副本，进仓库是纯噪音
+backup/
