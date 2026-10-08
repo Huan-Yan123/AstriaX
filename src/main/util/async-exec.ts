@@ -6,6 +6,75 @@ export interface RunResult {
   stderr: string
 }
 
+/*
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★★ 子进程输出解码：Windows 原生命令输出的是 **GBK**，不是 UTF-8
+ *    （主人 2026-10-08 实测抓出来的，影响面比想象大）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * ## 现场
+ *
+ * 主人的 QQ 装在 `E:\扣扣`（中文目录），程序显示「未安装 QQ」。
+ * 查到最后是这一行：
+ *
+ *     child.stdout.on('data', (b) => { out += b.toString() })   ← 默认 UTF-8
+ *
+ * `reg.exe query` 输出的是 **GBK**，按 UTF-8 解出来是：
+ *
+ *     Install    REG_SZ    E:\�ۿ�      ← 乱码
+ *
+ * 拿这个乱码路径去 `existsSync()`，当然找不到 —— 于是"未安装 QQ"。
+ *
+ * ## 为什么不好发现（我绕了一大圈）
+ *
+ * 用 `execFileSync` 验证是**正确**的（`E:\扣扣`），因为它默认按系统
+ * 代码页解码；而程序实际用的是**流式 spawn + `b.toString()`**，
+ * 那才走 UTF-8。**验证方式必须和真实路径一致**，否则会得出
+ * "编码没问题"的错误结论 —— 我第一轮就是这么被带偏的。
+ *
+ * 实测四种命令的对照（UTF-8 解 vs GBK 解）：
+ *
+ *     reg.exe      ❌ E:\�ۿ�     ✅ E:\扣扣
+ *     netstat      ❌ ��������     ✅ 活动连接
+ *     powershell   ❌ ���Ĳ���     ✅ 中文测试
+ *     tasklist     ✅（纯 ASCII，两者一样）
+ *
+ * 所以**所有**含中文的输出都会乱码，不只是 QQ 检测。
+ *
+ * ## 解码策略
+ *
+ * 不能无脑用 GBK —— 有些子进程（Node 自己、以及我们明确让它输出
+ * UTF-8 的 PowerShell 脚本）吐的是 UTF-8，用 GBK 解反而坏掉。
+ *
+ * 判据：**先按 UTF-8 严格解；能解开且没有替换字符就用它，
+ * 否则回退 GBK**。UTF-8 是自校验编码，合法序列才解得出来，
+ * 所以这个判断是可靠的：
+ *   · 真 UTF-8 → 严格解成功 → 用 UTF-8 ✅
+ *   · GBK 中文  → 严格解失败（出现 U+FFFD）→ 回退 GBK ✅
+ *
+ * 用 `TextDecoder('utf-8', { fatal: true })` 做"严格解"——
+ * 它对非法序列直接抛错，比事后找 U+FFFD 更准。
+ */
+function decodeChunk(buf: Buffer): string {
+  if (!buf.length) return ''
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf)
+  } catch {
+    /*
+     * 不是合法 UTF-8 → 当 GBK 解（中文 Windows 的默认代码页）。
+     *
+     * `gbk` 是 WHATWG 编码名，Node 的 TextDecoder 在 Windows 上支持它。
+     * 万一某个环境不支持，退回 latin1 至少不会抛错（内容仍是错的，
+     * 但比让整个命令失败好 —— 调用方大多只关心 ASCII 部分）。
+     */
+    try {
+      return new TextDecoder('gbk').decode(buf)
+    } catch {
+      return buf.toString('latin1')
+    }
+  }
+}
+
 export interface RunOptions {
   cwd?: string
   env?: NodeJS.ProcessEnv
@@ -123,14 +192,14 @@ export function run(cmd: string, args: string[], opts: RunOptions = {}): Promise
     }
 
     child.stdout?.on('data', (b: Buffer) => {
-      const s = b.toString()
+      const s = decodeChunk(b)
       out += s
       // 输出太多时只留尾部，避免长任务把内存吃光
       if (out.length > 4_000_000) out = out.slice(-2_000_000)
       opts.onData?.(s, 'out')
     })
     child.stderr?.on('data', (b: Buffer) => {
-      const s = b.toString()
+      const s = decodeChunk(b)
       err += s
       if (err.length > 4_000_000) err = err.slice(-2_000_000)
       opts.onData?.(s, 'err')

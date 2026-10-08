@@ -106,6 +106,14 @@ interface LauncherApi {
      * 真正的停止要等 pip/fetch 响应，界面靠后续的 error 事件确认。
      */
     cancel?: (p: { type: 'a' | 'n'; tag: string }) => Promise<{ ok: boolean; reason?: string }>
+    /**
+     * 给某个已装的 AstrBot 版本手动装 pip 库。
+     *
+     * `tag` 决定装到哪个运行时目录（`runtimes\a\<tag>`）——
+     * 该版本的所有实例都能立刻 import 到（依赖本来就是共享的）。
+     * 失败时抛出的 Error 里带着 pip 的原始输出尾部。
+     */
+    installPip?: (p: { tag: string; packageSpec: string }) => Promise<unknown>
   }
   instance?: {
     list?: () => Promise<
@@ -733,6 +741,70 @@ function selectResource(type: 'a' | 'n'): void {
 }
 function changeResourcePage(next: number): void {
   resourcePage.value = Math.min(Math.max(1, next), resourcePageCount.value)
+}
+
+/*
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★ 手动安装 pip 库（主人 2026-10-08）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * AstrBot 的插件常要额外 Python 库，而我们的 AstrBot 是 pip --target
+ * 装出来的 CLI 形态 —— 从它自己的 WebUI 里装不进去（缺我们那套环境变量）。
+ * 用户只能自己开命令行敲 pip，但他不知道要用哪个 python.exe。
+ * 这个功能就是把那件事做成一个输入框。
+ *
+ * ## 为什么必须让用户选版本
+ *
+ * 依赖是**按运行时版本分目录**的（`runtimes\a\v4.x.x`）。
+ * 同时装了两个版本的用户，选错就是"装了但实例还是 import 不到"。
+ * 所以下拉里列的是**已装的 AstrBot 版本**，默认选第一个。
+ *
+ * 只列 AstrBot：NapCat 是 Node 写的，没有 pip 概念。
+ */
+const pipTag = ref('')
+const pipSpec = ref('')
+const pipBusy = ref(false)
+const pipMsg = ref('')
+const pipErr = ref('')
+
+/** 已装的 AstrBot 版本（下拉选项） */
+const pipTargets = computed(() => installedA.value.map((r) => r.tag))
+
+/*
+ * 版本列表变化时校正选择：
+ *   · 当前选的不在了（被删了 / 还没选）→ 落到第一个
+ * 用 watch 而不是只在挂载时算一次 —— 用户可能刚在下面删掉一个版本。
+ */
+watch(pipTargets, (list) => {
+  if (!list.includes(pipTag.value)) pipTag.value = list[0] ?? ''
+}, { immediate: true })
+
+async function installPip(): Promise<void> {
+  const spec = pipSpec.value.trim()
+  if (!pipTag.value) {
+    pipErr.value = '先选一个 AstrBot 版本'
+    return
+  }
+  if (!spec) {
+    pipErr.value = '先填要装的库名（比如 requests）'
+    return
+  }
+  pipBusy.value = true
+  pipErr.value = ''
+  pipMsg.value = ''
+  try {
+    await api().runtimes?.installPip?.({ tag: pipTag.value, packageSpec: spec })
+    pipMsg.value = `已给 AstrBot ${pipTag.value} 装好：${spec}`
+    pipSpec.value = ''
+  } catch (e) {
+    /*
+     * 主进程的报错里已经带了 pip 的原始输出（最后几行），
+     * 直接展示 —— 用户拿这个去搜比我概括一句有用得多。
+     */
+    pipErr.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    pipBusy.value = false
+  }
 }
 
 interface EnvironmentInfo {
@@ -1822,17 +1894,18 @@ onUnmounted(() => {
       </aside>
 
       <main class="resource-main">
-        <section class="resource-section environment-section">
-          <div class="section-head"><div><span class="section-index">02</span><h2>运行环境</h2></div><button class="tool-btn" type="button" :disabled="environmentLoading || qqBusy" @click="refreshEnvironment">{{ environmentLoading || qqBusy ? '检测中…' : '重新检测环境' }}</button></div>
-          <div class="environment-grid">
-            <div class="environment-cell"><span>系统</span><b>{{ environment?.os ?? '检测中…' }}</b></div>
-            <div class="environment-cell"><span>处理器</span><b :title="environment?.cpu">{{ environment?.cpu ?? '检测中…' }}</b></div>
-            <div class="environment-cell"><span>显卡</span><b :title="environment?.gpu">{{ environment?.gpu ?? '检测中…' }}</b></div>
-            <div class="environment-cell"><span>内存</span><b>{{ environment ? `${environment.memoryUsed} / ${environment.memory}` : '检测中…' }} <small>可用 {{ environment?.memoryFree ?? '—' }}</small></b></div>
-            <div class="environment-cell"><span>Python</span><b class="env-stack"><i :class="{ good: py?.ready }" />{{ environment?.python ?? '检测中…' }}</b><button v-if="!py?.ready" class="row-action primary env-action" :disabled="pyBusy" @click="installPython">{{ pyBusy ? '安装中' : '安装' }}</button></div>
-            <div class="environment-cell"><span>QQ</span><b class="env-stack" :title="qq?.reason"><i :class="{ good: qq?.ok }" />{{ environment?.qq ?? '未检测' }}</b><div class="env-actions"><button v-if="qq && !qq.ok" class="row-action primary env-action" @click="openQQDownload">下载 QQ</button></div></div>
-          </div>
-        </section>
+        <!--
+          ★ 分区顺序**以模板顺序为准**（主人 2026-10-08）
+
+          01 安装版本 → 02 运行环境 → 03 下载资源 → 04 安装 pip 库
+
+          这里曾用 CSS `order` 重排显示，而编号写死在模板里 ——
+          两者一旦不一致就会出现"序号乱跳"。新加的 04（pip 库）
+          因为没有 order 值被那条通配规则抢到了最前，界面成了 01、04、02、03。
+
+          现在把模板顺序**改成就该显示的顺序**，并删掉所有 order
+          （见下面 .resource-main 的说明）：加分区只需按位置插入。
+        -->
 
         <section class="resource-section">
           <div class="section-head"><div><span class="section-index">01</span><h2>安装版本</h2></div>
@@ -1855,6 +1928,23 @@ onUnmounted(() => {
               <span>{{ resourcePage }} / {{ resourcePageCount }}</span>
               <button class="page-btn" type="button" :disabled="resourcePage >= resourcePageCount" @click="changeResourcePage(resourcePage + 1)">›</button>
             </div>
+          </div>
+        </section>
+
+        <!--
+          02 运行环境
+          放在「安装版本」之后：用户的实际顺序是先看环境（Python/QQ 装没装），
+          再决定装哪个版本 —— 但编号上它仍是 02，因为 01 是这一页的核心动作。
+        -->
+        <section class="resource-section environment-section">
+          <div class="section-head"><div><span class="section-index">02</span><h2>运行环境</h2></div><button class="tool-btn" type="button" :disabled="environmentLoading || qqBusy" @click="refreshEnvironment">{{ environmentLoading || qqBusy ? '检测中…' : '重新检测环境' }}</button></div>
+          <div class="environment-grid">
+            <div class="environment-cell"><span>系统</span><b>{{ environment?.os ?? '检测中…' }}</b></div>
+            <div class="environment-cell"><span>处理器</span><b :title="environment?.cpu">{{ environment?.cpu ?? '检测中…' }}</b></div>
+            <div class="environment-cell"><span>显卡</span><b :title="environment?.gpu">{{ environment?.gpu ?? '检测中…' }}</b></div>
+            <div class="environment-cell"><span>内存</span><b>{{ environment ? `${environment.memoryUsed} / ${environment.memory}` : '检测中…' }} <small>可用 {{ environment?.memoryFree ?? '—' }}</small></b></div>
+            <div class="environment-cell"><span>Python</span><b class="env-stack"><i :class="{ good: py?.ready }" />{{ environment?.python ?? '检测中…' }}</b><button v-if="!py?.ready" class="row-action primary env-action" :disabled="pyBusy" @click="installPython">{{ pyBusy ? '安装中' : '安装' }}</button></div>
+            <div class="environment-cell"><span>QQ</span><b class="env-stack" :title="qq?.reason"><i :class="{ good: qq?.ok }" />{{ environment?.qq ?? '未检测' }}</b><div class="env-actions"><button v-if="qq && !qq.ok" class="row-action primary env-action" @click="openQQDownload">下载 QQ</button></div></div>
           </div>
         </section>
 
@@ -1885,6 +1975,51 @@ onUnmounted(() => {
           <p v-if="impErr" class="import-note bad">{{ impErr }}</p>
           <p v-else-if="impMsg" class="import-note">{{ impMsg }}</p>
           <div v-if="showAdd" class="addbox"><input v-model="newBase" class="inp wide" placeholder="https://镜像地址/" /><input v-model="newLabel" class="inp" placeholder="名称" /><button class="action-btn primary" @click="addMirror">添加</button></div>
+        </section>
+
+        <!--
+          ★ 手动安装 pip 库（主人 2026-10-08）
+
+          AstrBot 的插件常要额外 Python 库，而它是 pip --target 装出来的
+          CLI 形态 —— 从自己的 WebUI 里装不进去（缺我们那套环境变量），
+          用户也不知道该用哪个 python.exe。这里把这件事做成输入框。
+
+          为什么要选版本：依赖按运行时版本分目录（runtimes\a\v4.x.x）。
+          同时装两个版本的用户，选错就是"装了但实例还是 import 不到"。
+
+          为什么只列 AstrBot：NapCat 是 Node 写的，没有 pip 概念。
+          一个都没装时不显示这一块（避免给用户一个点不动的空表单）。
+        -->
+        <section v-if="pipTargets.length" class="resource-section pip-section">
+          <div class="section-head">
+            <div><span class="section-index">04</span><h2>安装 pip 库</h2></div>
+          </div>
+          <p class="pip-note">
+            给 AstrBot 补装 Python 库（插件常需要）。装好后<b>该版本的所有实例</b>都能用 —— 依赖是按版本共享的。
+          </p>
+          <div class="pip-form">
+            <label class="pip-field">
+              <span>装到哪个版本</span>
+              <select v-model="pipTag" class="inp" :disabled="pipBusy">
+                <option v-for="t in pipTargets" :key="t" :value="t">AstrBot {{ t }}</option>
+              </select>
+            </label>
+            <label class="pip-field grow">
+              <span>库名</span>
+              <input
+                v-model="pipSpec"
+                class="inp wide"
+                :disabled="pipBusy"
+                placeholder="例如 requests，也可写 requests>=2.31"
+                @keyup.enter="installPip"
+              />
+            </label>
+            <button class="action-btn primary" :disabled="pipBusy || !pipSpec.trim()" @click="installPip">
+              {{ pipBusy ? '安装中…' : '安装' }}
+            </button>
+          </div>
+          <p v-if="pipErr" class="pip-note bad">{{ pipErr }}</p>
+          <p v-else-if="pipMsg" class="pip-note ok">{{ pipMsg }}</p>
         </section>
       </main>
     </div>
@@ -1980,10 +2115,31 @@ onUnmounted(() => {
 .env-truncate { display:block; }
 .env-line b.ready { color:var(--ribbon-run); }
 .resource-main { min-width:0; display:flex; flex-direction:column; }
-.resource-main > .resource-section:not(.runtime-section):not(.environment-section):not(.source-section) { order:1; }
-.environment-section { order:2; }
-.runtime-section { order:3; }
-.source-section { order:4; }
+/*
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★★ 分区顺序：**以 DOM 顺序为准**（主人 2026-10-08 发现序号错乱）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * ## 原来错在哪
+ *
+ * 这里曾用 CSS `order` 重排显示，而模板里的编号（01/02/03…）是写死的：
+ *
+ *     DOM:  运行环境  安装版本  下载资源
+ *     order:  env=2   runtime=3  source=4
+ *     rule:  「不是这三个之一」的 section 一律 order:1   ← 这一行是祸根
+ *
+ * 于是新加的「安装 pip 库」（04）没有 order 值 → **默认 0** →
+ * 被那条通配规则之外地抢到了最前面，界面变成 01、04、02、03。
+ *
+ * ## 为什么直接删掉 order 而不是补一条 .pip-section{order:5}
+ *
+ * 补一条只是把这次的问题盖住 —— 下次再加分区还会忘。
+ * 那段 `:not(...):not(...):not(...)` 的写法本身就是"新增即踩雷"：
+ * 它默认"没列出来的都排第一"，而正确默认应当是**不动**。
+ *
+ * 现在 DOM 顺序就是显示顺序（模板里也确实是按 01→02→03→04 写的），
+ * 加分区只要按位置插进模板即可，不会再有隐式重排。
+ */
 .resource-section { padding:0 0 22px; margin:0 0 22px; border-bottom:1px solid var(--hairline); }
 .section-head { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:12px; }
 .section-head > div { display:flex; align-items:baseline; gap:10px; }
@@ -2033,6 +2189,25 @@ onUnmounted(() => {
 .import-result b { flex:1; min-width:0; font-weight:650; }
 .import-actions { display:flex; gap:6px; flex-shrink:0; }
 .import-note { margin:8px 0 0; font-size:11px; color:var(--ink-soft); white-space:pre-line; }
+
+/*
+ * 安装 pip 库（资源页第 04 块）
+ *
+ * 与上面几个区块共用 section 的排版（.resource-section / .section-head），
+ * 这里只补表单本身。
+ */
+.pip-note { margin:0 0 10px; color:var(--ink-soft); font-size:11px; line-height:1.6; }
+.pip-note b { color:var(--ink); font-weight:650; }
+.pip-note.bad, .pip-note.ok { margin-top:10px; white-space:pre-line; }
+/* 错误用统一的红，成功用项目表示"正常"的绿（与状态点同色） */
+.pip-note.bad { color:var(--ribbon-error); }
+.pip-note.ok { color:var(--mint); }
+.pip-form { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+.pip-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.pip-field.grow { flex:1 1 260px; }
+.pip-field > span { color:var(--ink-soft); font-size:10px; font-weight:700; letter-spacing:.04em; }
+.pip-field select.inp { min-width:190px; }
+.pip-form .action-btn { flex:none; }
 .task-strip { margin-top:14px; padding:9px 12px; border:1px solid #cbd8ed; border-left:3px solid var(--primary); background:#f7faff; }
 .strip-label { display:flex; align-items:center; gap:6px; margin-bottom:5px; color:var(--primary-deep); font-size:10px; font-weight:800; }
 .live-dot { width:6px; height:6px; border-radius:50%; background:#2d9a70; }

@@ -1,8 +1,8 @@
 {
-  "version": "1.0.0",
-  "url": "AstriaX-Setup-1.0.0.exe",
-  "sha256": "11c822dc5f891e5ec6b1331d3a5411e857b221a655a3cc9544caa2d864993573",
-  "size": 85955878,
-  "releasedAt": "2026-10-08T13:31:57.911Z",
-  "notes": "修复：检查更新只试直链（国内必然失败）导致永远显示「已是最新版本」。现在会用多个加速源。"
+  "version": "1.0.1",
+  "url": "AstriaX-Setup-1.0.1.exe",
+  "sha256": "34612def5b7a2eca64c65e8f901017ad969a9d6a84106b6030bed6953206d956",
+  "size": 85958737,
+  "releasedAt": "2026-10-08T16:08:12.592Z",
+  "notes": "修复：中文路径下检测不到 QQ（子进程输出用 UTF-8 解，而 Windows 原生命令输出 GBK）\n  影响不止 QQ —— reg.exe / netstat / powershell 的含中文输出全都会乱码\n新增：资源页「安装 pip 库」—— 给指定 AstrBot 版本补装 Python 库\n修复：资源页分区序号错乱（01 04 02 03）\n优化：下载源检测的稳定性"
 }

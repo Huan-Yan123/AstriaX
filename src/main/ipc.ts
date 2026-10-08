@@ -806,6 +806,8 @@ export type HandlerMap = {
   'runtime:install': HandlerFn<[{ type: 'a' | 'n'; tag: string; base?: string }]>
   'runtimes:list': HandlerFn<[]>
   'runtimes:remove': HandlerFn<[{ type: 'a' | 'n'; tag: string }]>
+  /** 给某个 AstrBot 运行时版本手动装 pip 库（资源页的「安装 pip 库」） */
+  'runtime:installPip': HandlerFn<[{ tag: string; packageSpec: string }]>
   /**
  * 手动导入：弹文件选择框挑压缩包
  */
@@ -3947,6 +3949,126 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
  * 删运行时版本。 ## 什么情况允许删 有实例**只是引用**着这个版本（但没在跑）→ **允许删**。 这时实例下次启动会找不到运行时、启动失败并给出明确提示 （见 resolveLaunchSpec / instance:start 的报错），**不会静默跑坏**， 用户重新下载同一个版本或换个版本即可。 下载页的确认弹窗也是这么写的（「已用它创建的实例不受影响」）， 两边说法一致。 ## 什么情况**必须拦* 有实例**正在这个版本上运行* → 拒绝，并告诉用户先停掉它。 这是实机踩出来的坑（问题报告v2 第 9、4、7 条都是它的连锁后果）： 用户在 AstrBot 实例运行中的时候删了 v4.27.0，结果那个版本目录被 **删了一半**—— runtimes\a\v4.27.0.deleting-xxx\ aiohttp/ anthropic/ numpy/ ... ← 依赖还在（没被锁） astrbot/ ← **整个空掉了**（模块文件被删） 因为正在运行的 python 进程把 `astrbot\*.pyc`、`.pyd` 这类文件锁住了， 异步删除删不动它们、又已经把能删的都删了，最后留下一个残缺目录。 连锁反应： - 实例当场半死（代码被抽走） - 那个实例卡片显示「版本未知」——读不到包内版本标识了 - `.deleting-*` 目录永远删不掉（文件被锁），成了永久垃圾 - 用户想重装同版本，还得先手工清掉它 所以判据必须是**进程真正在跑**（status === 'running'）， 而不是「有没有实例引用它」。前者是在动活人的代码，后者只是留个坑。 顺带：这也解释了用户问的「为什么删了就不能启动，不是复制一份吗」—— 运行时是**同类实例共享**的一份（省磁盘），不是每个实例各拷一份。
  */
 
+    /**
+     * ★★ 手动给某个 **AstrBot 运行时版本**装 pip 库（主人 2026-10-08）
+     *
+     * 资源页的「安装 pip 库」用它。参数里的 `tag` 决定装到哪个版本目录：
+     *
+     *     runtimes\a\<tag>\           ← 目标（与 AstrBot 自己的依赖同一层）
+     *
+     * 为什么必须让用户**选版本**：一个用户可能同时装着 v4.28.0 和 v4.27.0，
+     * 而两个版本各自的依赖是独立的（我们按版本分目录）。选错了就是
+     * "装了但那个实例还是 import 不到" —— 很难自查。
+     *
+     * 为什么只允许 AstrBot：NapCat 是 Node 写的，没有 pip 概念。
+     */
+    'runtime:installPip': async (p: { tag: string; packageSpec: string }) => {
+      const { config: cfg } = state()
+      const store = runtimeStore(cfg.dataRoot)
+
+      const tag = String(p?.tag ?? '').trim()
+      const packageSpec = String(p?.packageSpec ?? '').trim()
+      if (!tag) throw new Error('没选版本 —— 先在下拉里选一个 AstrBot 版本')
+      if (!packageSpec) throw new Error('没填库名')
+
+      /* 目标目录必须**已安装**：不存在的版本上装库没有意义 */
+      const dir = store.dirFor('a', tag)
+      if (!existsSync(dir)) {
+        throw new Error(
+          `AstrBot ${tag} 还没装到本机，不能给它装库。\n` +
+            `先到上面「安装版本」里装好这个版本，或者换一个已装的版本。`
+        )
+      }
+
+      /* 内置 Python 是 pip 的执行者，没装就没法装任何库 */
+      const pyExe = pythonExeFor(cfg.dataRoot)
+      if (!existsSync(pyExe)) {
+        throw new Error('还没内置 Python 3.12 —— 去「运行环境」里先装好 Python，再来装库')
+      }
+
+      /*
+       * 登记任务，让「取消」能取消。
+       *
+       * 与其它安装路径同一套（python:install / runtime:install /
+       * runtimes:importFile 都登记）：不登记的话点取消查不到任务，
+       * 返回 ok:false，界面什么都不做 —— 那就是"取消按钮是死的"。
+       *
+       * 键用 `a:<tag>` —— 与进度事件的 type/tag 完全一致，
+       * 界面按 `${p.type}|${p.tag}` 就能对上号。
+       */
+      const key = taskKey('a', tag)
+      if (findTask(key)) {
+        throw new Error(`AstrBot ${tag} 上已经有一个装库任务在跑，等它完成或先取消`)
+      }
+      const task = beginTask({
+        key,
+        kind: 'install',
+        controller: new AbortController(),
+        label: `给 ${tag} 装 ${packageSpec}`
+      })
+      if (!task) throw new Error(`AstrBot ${tag} 上的装库任务已经在了`)
+      const signal = task.controller.signal
+
+      const send = (extra: Partial<DownloadProgress> & { phase: DownloadProgress['phase'] }): void => {
+        sendDownloadProgress({
+          type: 'a',
+          tag,
+          got: 0,
+          total: undefined,
+          percent: null,
+          bytesPerSec: 0,
+          gotText: '',
+          speedText: '',
+          done: false,
+          label: `pip install ${packageSpec}`,
+          ...extra
+        })
+      }
+
+      try {
+        send({ phase: 'downloading', speedText: `准备安装 ${packageSpec}…` })
+
+        const res = await installPipPackage({
+          pythonExe: pyExe,
+          runtimeDir: dir,
+          dataRoot: cfg.dataRoot,
+          packageSpec,
+          signal,
+          onStage: (msg) => send({ phase: 'downloading', speedText: msg })
+        })
+
+        if (!res.ok) {
+          send({ phase: 'error', error: res.reason })
+          opts.logger?.log('WARN', 'proc', `给 AstrBot ${tag} 装 ${packageSpec} 失败：${res.reason}`)
+          throw new Error(res.reason)
+        }
+
+        opts.logger?.log('INFO', 'proc', `已给 AstrBot ${tag} 装好 pip 库：${packageSpec}`)
+        send({ phase: 'done', speedText: `已安装 ${packageSpec}`, done: true, percent: 100 })
+        opts.audit?.record({
+          actor: 'user',
+          action: 'runtime.installPip',
+          target: `${tag} / ${packageSpec}`,
+          result: 'ok',
+          detail: dir
+        })
+        return { ok: true, tag, packageSpec, dir }
+      } catch (e) {
+        /*
+         * 失败/取消都要发一条 error 进度 —— 渲染层的进度条只认 done/error
+         * 才收尾，漏发的话那条会**永远亮着**"正在装"。
+         */
+        const msg = e instanceof Error ? e.message : String(e)
+        if (signal.aborted) {
+          send({ phase: 'error', error: '已取消 —— 这次装的库不会生效' })
+        }
+        throw e
+      } finally {
+        /* 成功/失败/取消三条路径都要释放，否则这个键会永远占着 */
+        endTask(key, task.controller)
+      }
+    },
+
     'runtimes:remove': async (p) => {
       const { config: cfg, repo: r } = state()
       const store = runtimeStore(cfg.dataRoot)
@@ -5903,7 +6025,140 @@ async function installAstrbotDeps(deps: {
     return { ok: false, reason: `pip 退出码 ${r.status}：${tail || '(无 stderr)'}` }
   } catch (e) {
     return { ok: false, reason: e instanceof Error ? e.message : String(e) }
-  }}/**
+  }
+}
+
+/**
+ * ★★ 给某个运行时目录**手动装 pip 库**（主人 2026-10-08）
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * 为什么要有它
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * AstrBot 的插件经常需要额外的 Python 库（`pip install xxx`）。
+ * 而我们的 AstrBot 是 **pip --target 装出来的 CLI 形态** ——
+ * 从 AstrBot 自己的 WebUI 里点「安装插件依赖」是装不进去的：
+ *
+ *   · 它没有我们那份内置 Python 的环境变量（PYTHONHOME / MXBOT_SITE）
+ *   · 它的 sys.path 里也没有运行时目录（embed 版靠 sitecustomize 插的，
+ *     而那个 sitecustomize 只在**我们启动**的解释器里生效）
+ *
+ * 所以用户只能自己开命令行敲 pip —— 但他根本不知道要用哪个 python.exe、
+ * 参数该带什么。这个功能就是把那件事做成一个输入框。
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★ 装到哪：与现有依赖**同一个目录**（刻意不改架构）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * 目标就是 `runtimes\a\<tag>`（运行时不目录本身），和 AstrBot 自己的
+ * 依赖、以及手动导入补装依赖**完全一致**：
+ *
+ *   · 该运行时的**所有实例**立刻都能 import 到（本来就是共享的）
+ *   · sitecustomize / MXBOT_SITE / PYTHONPATH 那套机制**原样生效**，
+ *     不需要新增任何路径注入
+ *
+ * 主人在 2026-10-08 明确要求「不改架构，纯加功能，按现在的实现来加」——
+ * 所以我一度想做的"实例专属包目录"没有做：那要动启动链路
+ *（实例目录优先于共享目录），属于架构改动，不是这个功能该背的责任。
+ *
+ * ## 包名要做校验（不能直接把用户输入拼进命令行）
+ *
+ * `spawn` 不走 shell，所以没有命令注入面；但**参数注入**是有的：
+ * 用户输入 `--target C:\Windows` 这种会被 pip 当成选项。
+ * 所以用 PEP 508 的包名格式卡死：字母数字开头、允许 `.-_` 与版本约束。
+ */
+async function installPipPackage(deps: {
+  pythonExe: string
+  runtimeDir: string
+  dataRoot: string
+  /** 用户输入的包名（可能带版本约束，如 `requests>=2.31`） */
+  packageSpec: string
+  /** pip 源（不传则读用户设置） */
+  source?: PythonSource
+  signal?: AbortSignal
+  onStage?: (msg: string) => void
+}): Promise<{ ok: boolean; reason: string; packages: string[] }> {
+  const spec = deps.packageSpec.trim()
+  if (!spec) return { ok: false, reason: '没有输入包名', packages: [] }
+
+  /*
+   * 校验包名格式。
+   *
+   * 允许的形态（都是 pip 真实接受的）：
+   *   requests
+   *   requests==2.31.0
+   *   requests>=2.31,<3
+   *   AstrBot-plugin-xxx
+   *
+   * 明确**拒绝**的：以 `-` 开头的（那是 pip 的选项，如 `--target`）、
+   * 含空格或引号的（用户可能误粘整条命令）。
+   */
+  if (/^-/.test(spec)) {
+    return { ok: false, reason: `包名不能以「-」开头（那是 pip 的选项）：${spec}`, packages: [] }
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]*(\[[A-Za-z0-9,._-]+\])?(([<>=!~]=?|===)[^,\s]+(,[^,\s]+)*)?$/.test(spec)) {
+    return {
+      ok: false,
+      reason: `包名格式不对：${spec}\n只填包名（可带版本，如 requests 或 requests>=2.31），不要带 pip 命令或空格`,
+      packages: []
+    }
+  }
+
+  const src = deps.source ?? resolvePythonSource(deps.dataRoot)
+  deps.onStage?.(`使用 Python 源：${src.label}`)
+
+  try {
+    const pipRun = await runPipWithCacheFallback(
+      run,
+      deps.pythonExe,
+      [
+        '-m', 'pip', 'install',
+        '--no-warn-script-location',
+        '--disable-pip-version-check',
+        /*
+         * `--upgrade` 让重复安装能覆盖已有版本（用户想升版本时会再点一次）。
+         * 没有它的话 pip 会说"已满足要求"直接跳过。
+         */
+        '--upgrade',
+        '--target', deps.runtimeDir,
+        spec,
+        ...pythonSourceToPipArgs(src)
+      ],
+      {
+        timeoutMs: 900000,
+        signal: deps.signal,
+        env: pipEnvFor(deps.dataRoot, {
+          ...process.env,
+          PYTHONHOME: pythonDirFor(deps.dataRoot)
+        }),
+        /* 把 pip 的输出转发出去：装依赖要几分钟，界面得显示在动 */
+        onData: (chunk: string) => {
+          const clean = String(chunk ?? '')
+            .replace(/\x1b\[[0-9;]*m/g, '')
+            .trim()
+          if (!clean) return
+          /* 只回报"有意义"的行，别把进度条刷屏 */
+          if (/^(Requirement already|Collecting|Installing|Successfully|ERROR|WARNING|Downloading)/i.test(clean)) {
+            deps.onStage?.(clean.slice(-70))
+          }
+        }
+      }
+    )
+    const r = pipRun.result
+    if (pipRun.retriedNoCache) deps.onStage?.('（第一次失败，已绕过缓存重试）')
+
+    if (r.status === 0) {
+      clearPythonSourceFailures()
+      return { ok: true, reason: '', packages: [spec] }
+    }
+    markPythonSourceFailed(src.indexUrl)
+    const tail = String(r.stderr ?? '').trim().split(/\r?\n/).slice(-4).join('\n')
+    return { ok: false, reason: `pip 退出码 ${r.status}：\n${tail || '(无 stderr)'}`, packages: [] }
+  } catch (e) {
+    return { ok: false, reason: e instanceof Error ? e.message : String(e), packages: [] }
+  }
+}
+/**
  * 探一下"这个 AstrBot 运行时的依赖装了没有"。 ## 为什么需要它（审查抓出的死锁） 主人实测的闭环：导入 whl → 解压成功 → pip 装依赖失败 → 目录留下（且已登记进清单）→ 用户按提示再导一次 → 被 `existsSync(dest)` 拦死「已经有一个 vX 了」→ **无路可走**。 判据刻意**宽松**（只要看起来装了就在）： · 依赖是 pip 装的，标志就是那几个顶层包目录 · 只看"有没有"，不校验版本完整性 —— 误判成"装了"只是维持原来的拦死行为， 而误判成"没装"会放行重装（pip --upgrade 覆盖式，安全） · 所以宁可偏"没装"（放行）也不要偏"装了"（拦死） 用 `astrbot/cli/__main__.py` 当前提：那是 PyPI 形态 AstrBot 的入口， 没有它就说明解压都没成功，谈不上依赖。
  */
 function astrbotDepsLookInstalled(runtimeDir: string): boolean {

@@ -150,7 +150,19 @@ export const api = {
      * 按 `<type>:<tag>` 定位 —— 与互锁共用键空间，
      * 不会出现"取消了 A 却把 B 停了"。
      */
-    cancel: (p: { type: 'a' | 'n'; tag: string }) => ipcRenderer.invoke('runtimes:cancel', p)
+    cancel: (p: { type: 'a' | 'n'; tag: string }) => ipcRenderer.invoke('runtimes:cancel', p),
+    /*
+     * 给某个 **AstrBot 运行时版本**手动装 pip 库（主人 2026-10-08）。
+     *
+     * 为什么要让用户选 tag：一个用户可能同时装着 v4.28.0 和 v4.27.0，
+     * 两个版本的依赖是**各自独立**的（我们按版本分目录）。
+     * 装错版本的表现是"装了但那个实例还是 import 不到"，很难自查。
+     *
+     * 库装到 `runtimes\a\<tag>\` —— 与 AstrBot 自己的依赖同一层，
+     * 所以该版本的**所有实例**立刻都能 import 到（依赖本来就是共享的）。
+     */
+    installPip: (p: { tag: string; packageSpec: string }) =>
+      ipcRenderer.invoke('runtime:installPip', p)
   },
   python: {
     status: () => ipcRenderer.invoke('python:status'),
