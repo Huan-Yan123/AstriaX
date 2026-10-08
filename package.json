@@ -1,0 +1,35 @@
+{
+  "name": "mxbot-launcher",
+  "productName": "AstriaX",
+  "version": "0.2.1",
+  "description": "AstriaX —— NapCat + AstrBot 多开管理器",
+  "license": "MIT",
+  "author": "梦见月下汐",
+  "main": "out/main/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dist": "electron-vite build && electron-builder",
+    "dist:both": "node scripts/build-both-versions.cjs",
+    "publish:gh": "node scripts/publish-github.cjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.0",
+    "@vue/test-utils": "^2.5.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "happy-dom": "^20.14.5",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "vue-tsc": "^2.1.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "pinia": "^4.0.3",
+    "vue": "^3.5.42"
+  }
+}
