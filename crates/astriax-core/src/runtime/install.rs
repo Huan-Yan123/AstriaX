@@ -128,13 +128,18 @@ async fn inner(
             args.push(format!("astrbot=={}", tag.trim_start_matches('v')));
         }
         task.progress("unpack", "使用所选 Python 源安装完整依赖", 0, None);
-        let spec = super::python::pip_spec(&root, &stage, args)?;
+        let spec = super::python::pip_spec(&root, &stage, args).await?;
         run(
             &spec,
             &task.token,
             &root.join("logs").join(format!("install-a-{tag}.log")),
         )
         .await?;
+        let python = super::python_selection::validate(&root).await?;
+        atomic_json(
+            &stage.join("python-abi.json"),
+            &json!({"version":python.version}),
+        )?;
         atomic_json(
             &stage.join("mxbot-runtime.json"),
             &json!({"kind":if stage.join("main.py").exists(){"source"}else{"pypi"},"version":tag.trim_start_matches('v')}),

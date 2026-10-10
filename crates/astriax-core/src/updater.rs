@@ -13,9 +13,15 @@ pub fn valid_manifest(value: &Value) -> bool {
             .as_str()
             .is_some_and(|v| v.parse::<semver::Version>().is_ok())
         && value["sha256"].as_str().is_some_and(valid_hash)
-        && value["url"]
-            .as_str()
-            .is_some_and(|u| crate::sources::url(u).is_ok())
+        && value["url"].as_str().is_some_and(valid_release_url)
+}
+pub fn valid_release_url(value: &str) -> bool {
+    crate::sources::url(value).is_ok()
+        && value.starts_with(crate::distribution::RELEASES)
+        && value.ends_with(".exe")
+        && !value.contains(['?', '#'])
+        && reqwest::Url::parse(value)
+            .is_ok_and(|url| url.path().starts_with("/Soffd/AstriaX/releases/download/"))
 }
 pub fn hash_file(file: &Path) -> Result<String> {
     let mut f = File::open(file)?;
@@ -38,7 +44,7 @@ pub async fn check(app: &Launcher, p: Value) -> Result<Value> {
     if p["force"] != true && now - last < 86_400_000 {
         return Ok(json!({"hasUpdate":false,"currentVersion":VERSION,"throttled":true}));
     }
-    let raw = format!("{}tauri-latest.json", crate::distribution::MANIFEST_BASE);
+    let raw = crate::distribution::MANIFEST_URL;
     let mut requests = futures_util::stream::FuturesUnordered::new();
     for prefix in crate::distribution::ACCELERATORS {
         let client = app.client.clone();
@@ -65,9 +71,9 @@ pub async fn check(app: &Launcher, p: Value) -> Result<Value> {
         }
     }
     let mut store = app.store.lock().await;
-    store.config["lastUpdateCheckAt"] = json!(now);
-    store.save_config()?;
     if let Some(m) = manifest {
+        store.config["lastUpdateCheckAt"] = json!(now);
+        store.save_config()?;
         let version = m["version"].as_str().unwrap();
         let newer =
             crate::runtime::versions::compare(version, VERSION, crate::domain::Kind::NapCat)
@@ -83,6 +89,11 @@ pub async fn check(app: &Launcher, p: Value) -> Result<Value> {
 pub async fn download(app: &Launcher, p: Value) -> Result<Value> {
     let version = segment(crate::domain::arg_string(&p, "version")?)?;
     let url = crate::domain::arg_string(&p, "url")?;
+    if !valid_release_url(url) {
+        return Err(Error::Invalid(
+            "安装包必须来自 Soffd/AstriaX 的 Release".into(),
+        ));
+    }
     let sha256 = p["sha256"]
         .as_str()
         .filter(|v| valid_hash(v))
@@ -105,8 +116,47 @@ pub async fn download(app: &Launcher, p: Value) -> Result<Value> {
     }
     part.persist(&target)
         .map_err(|e| Error::Storage(e.to_string()))?;
+    crate::storage::atomic_json(
+        &root.join("update-download.json"),
+        &json!({"path":target,"version":version,"url":url,"sha256":sha256}),
+    )?;
     task.finish(&Ok(json!(target)));
     Ok(json!(target))
+}
+pub fn downloaded(root: &Path) -> Result<std::path::PathBuf> {
+    let record: Value = crate::storage::read_json(&root.join("update-download.json"))?;
+    let manifest = json!({"runtime":"tauri","version":record["version"],"url":record["url"],"sha256":record["sha256"]});
+    if !valid_manifest(&manifest) {
+        return Err(Error::Invalid("已下载更新的校验记录无效".into()));
+    }
+    let file = std::path::PathBuf::from(crate::domain::arg_string(&record, "path")?);
+    let downloads =
+        dirs::download_dir().ok_or_else(|| Error::Storage("找不到系统下载目录".into()))?;
+    crate::storage::checked_path(&downloads, &file)?;
+    if hash_file(&file)? != record["sha256"].as_str().unwrap() {
+        return Err(Error::Invalid("安装包已改变，请重新下载更新".into()));
+    }
+    let mut magic = [0u8; 2];
+    File::open(&file)?.read_exact(&mut magic)?;
+    if magic != *b"MZ" {
+        return Err(Error::Invalid("安装包不是 PE 文件".into()));
+    }
+    Ok(file)
+}
+pub fn pending(root: &Path) -> Result<Value> {
+    if !root.join("update-download.json").is_file() {
+        return Ok(Value::Null);
+    }
+    let record: Value = crate::storage::read_json(&root.join("update-download.json"))?;
+    if crate::runtime::versions::compare(
+        record["version"].as_str().unwrap_or(""),
+        VERSION,
+        crate::domain::Kind::NapCat,
+    ) != std::cmp::Ordering::Greater
+    {
+        return Ok(Value::Null);
+    }
+    Ok(json!({"path":downloaded(root)?,"version":record["version"]}))
 }
 async fn verified_download(
     app: &Launcher,

@@ -51,9 +51,10 @@ pub(super) async fn dispatch(app: &Launcher, channel: &str, p: Value) -> Result<
                 .ok_or_else(|| Error::Network("没有可安装版本".into()))?;
             crate::runtime::install::install(app, json!({"type":kind,"tag":tag}), false).await
         }
-        "python:status" => {
-            let exe = crate::runtime::python::exe(&app.root().await);
-            Ok(json!({"ready":exe.is_file(),"version":crate::runtime::python::VERSION,"exe":exe}))
+        "python:status" => crate::runtime::python_selection::status(app, false).await,
+        "python:discover" => crate::runtime::python_selection::status(app, true).await,
+        "python:select" => {
+            crate::runtime::python_selection::select(app, std::path::Path::new(string(&p)?)).await
         }
         "python:install" => crate::runtime::python::install(app).await,
         "qq:status" => Ok(crate::platform::qq_status()),

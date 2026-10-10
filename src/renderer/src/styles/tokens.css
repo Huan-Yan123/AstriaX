@@ -1,360 +1,55 @@
 :root {
-  /*
-   * ══════════════════════════════════════════════════════════════════════
-   * 配色来自 logo，但不是"照着取色"—— 每一个值都经过对比度验算
-   * ══════════════════════════════════════════════════════════════════════
-   *
-   * UI 配色参考 logo 的像素分布：
-   *
-   *     #f8f8f8  19.33%   ← 近白底（圆形徽章外圈）
-   *     #3898f8   5.48%   ← 最亮的天蓝，图标主色
-   *     #2858a8   4.51%   ← 深海蓝，第二色块
-   *     #3868b8   2.85%
-   *     #6898e8   2.84%   ← 蓝紫过渡带
-   *
-   * ## 为什么没有直接把 #3898f8 当主色
-   *
-   * 图标主色是**在近白背景上画图形**用的，而界面主色要**承载白字** ——
-   * 这两个场景对亮度的要求不同。对比度计算：
-   *
-   *     #3898f8 上的白字 = 2.99   ← 远低于 AA 正文门槛 4.5，字会发飘
-   *
-   * 顺手体检了**换肤之前**的原配色，发现它本身就有 4 项不达标：
-   *
-   *     白字 on --primary(#4a7ddb)   = 4.00  ✗
-   *     次级字(--ink-soft) on 卡片   = 3.87  ✗
-   *     次级字 on 背景               = 3.58  ✗
-   *     白字 on 危险色(#c0564f)      = 4.48  ✗（差一点点）
-   *
-   * 也就是说「看不清」不全是新配色带来的，旧主题就有。
-   * 这次一并修掉，修完的实测值写在每个变量后面。
-   *
-   * ## 取向
-   *
-   * 图标是冷调蓝 + 一点点金（星星）。金色占比极小（<1%），
-   * 所以**不做第二强调色** —— 把大胆只留在一处（主色），
-   * 其余全部安静，避免"到处都在喊"的廉价感。
-   */
-  --bg: #f2f6fd; /* 轻盈的冷蓝白，取自 Logo 的白边与浅蓝 */
+  --bg: #f4f4f4;
   --card-a: #ffffff;
-  --card-n: #f7f9ff;
-
-  /*
-   * 主色取图标蓝紫过渡带里偏饱和的一支（色相 ≈ 215°，与图标同族），
-   * 压暗到能承载白字为止：
-   *     白字 on --primary        = 4.98  ✓（AA 正文）
-   *     白字 on --primary-deep   = 6.88  ✓
-   *     --primary-deep on 浅底   = 6.00  ✓
-   */
-  --primary: #2858a8; /* Logo 深蓝：压暗后承载白字，同时保留品牌色相 */
-  --primary-deep: #1e4388;
-  --primary-soft: #e8f0fd;
-
+  --card-n: #fafafa;
+  --primary: #252525;
+  --primary-deep: #111111;
+  --primary-soft: #eeeeee;
   --ribbon-run: #23745f;
-  --ribbon-stop: #e7eaf0;
+  --ribbon-stop: #eeeeee;
   --ribbon-error: #b34d45;
   --mint: #23745f;
-
-  /*
-   * 危险色也提成变量。
-   *
-   * 提到变量不是为了好看，是因为它原来在 tokens.css 里**写了两遍**
-   * （button.danger:hover 和 button.main.danger），而体检脚本里还有第三份。
-   * 三份各写各的，改一处另两处不知道 —— 这次就把三个值统一到这里，
-   * 以后再调只动一行。
-   */
-  --danger: #b34d45;
-  --danger-deep: #963f39;
-
-  --ink: #28354d;
-  /*
-   * 次级字压暗了一档：#7a8291 → #5c6674。
-   * 原来的 3.87 / 3.58 全都不达标，而它承载的是版本号、路径、说明
-   * 这类**用户真的要读**的信息，不是装饰。
-   *     新值 on 卡片 5.82 ✓   on 背景 5.38 ✓
-   */
-  --ink-soft: #586780;
-
-  --hairline: #dce4f1;
-  --glass-fill: rgba(247, 250, 255, 0.58);
-  --glass-panel: rgba(247, 250, 255, 0.76);
-  --glass-edge: rgba(255, 255, 255, 0.9);
-  --glass-shadow: 0 8px 32px rgba(40, 88, 168, 0.12), 
-                  0 2px 8px rgba(40, 88, 168, 0.08),
-                  inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --glass-shadow-hover: 0 12px 48px rgba(40, 88, 168, 0.18), 
-                        0 4px 16px rgba(40, 88, 168, 0.12),
-                        inset 0 1px 0 rgba(255, 255, 255, 1);
-  --radius-card: 12px;
-  --radius-ctrl: 8px;
-  --font: 'Segoe UI', 'MiSans', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
-  
-  /* 动画参数 */
-  --ease-out-smooth: cubic-bezier(0.2, 0.8, 0.3, 1);
-  --ease-in-smooth: cubic-bezier(0.7, 0, 0.8, 0.2);
-  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  --ease-fluid: cubic-bezier(0.4, 0, 0.2, 1);
-  --duration-fast: 180ms;
-  --duration-base: 280ms;
-  --duration-slow: 420ms;
+  --danger: #b33b35;
+  --danger-deep: #902d28;
+  --ink: #202124;
+  --ink-soft: #6c6c6c;
+  --hairline: #e5e5e5;
+  --glass-fill: #fafafa;
+  --glass-panel: #ffffff;
+  --glass-edge: #e5e5e5;
+  --glass-shadow: 0 16px 48px rgba(0, 0, 0, .12);
+  --glass-shadow-hover: 0 16px 48px rgba(0, 0, 0, .12);
+  --radius-card: 18px;
+  --radius-ctrl: 10px;
+  --font: 'Segoe UI', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+  --ease-out-smooth: ease-out;
+  --ease-in-smooth: ease-in;
+  --ease-bounce: ease;
+  --ease-fluid: ease;
+  --duration-fast: 120ms;
+  --duration-base: 160ms;
+  --duration-slow: 200ms;
 }
-html,
-body {
-  margin: 0;
-  height: 100%;
-}
-body {
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font);
-  line-height: 1.45;
-}
-* {
-  box-sizing: border-box;
-}
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--primary) 28%, transparent);
-  outline-offset: 2px;
-}
-/*
- * 隐藏滚动条，但保留滚动能力。
- *
- * 为什么：这是自绘标题栏的卡片式界面，右边突然竖一条灰色滚动条很出戏，
- * 而且它会占掉约 15px 宽度、把内容挤得和标题栏对不齐。
- * 用 `scrollbar-width: none`（Firefox/新标准）+ `::-webkit-scrollbar{display:none}`
- * （Chromium，也就是 Electron 实际用的那条）覆盖两种实现。
- *
- * 不要改成 `overflow: hidden`：那样内容超出就真的滚不动了。
- * 这里只是让条子不可见，滚轮/触控板/键盘照样能滚。
- */
-* {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-*::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
-}
-button {
-  font-family: inherit;
-  cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-fluid);
-}
-
-button:active {
-  transform: scale(0.97);
-}
-
-/*
- * 全局兜底：把「自家按钮」的最小外观钉在这里。
- *
- * 起因：弹窗外壳（.mask/.dlg）被多个组件各自实现一遍，某个组件忘了写
- * .main/.ghost 的样式，按钮就退回浏览器默认外观——用户看到的就是「原生 UI」，
- * 跟旁边精致的卡片完全不搭。scoped 样式各写各的必然漏，所以基线放全局。
- * 组件里再写 .main/.ghost 只做覆盖（颜色/尺寸），不会退回默认。
- */
-button.main,
-button.ghost,
-button.danger,
-button.mini {
-  border-radius: var(--radius-ctrl);
-  font-size: 13px;
-  padding: 8px 18px;
-  border: 1px solid var(--hairline);
-  background: #fff;
-  color: var(--ink-soft);
-  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
-}
-button.main {
-  border: none;
-  background: var(--primary);
-  color: #fff;
-  font-weight: 600;
-}
-/*
- * hover 时背景变深（--primary → --primary-deep），**白字保持不变**。
- * 这条是 hover-contrast 测试重点盯的地方：只改背景不管文字色，
- * 一旦变成浅底白字，字就"消失"了。深底白字不存在这个问题。
- */
-button.main:hover:not(:disabled) {
-  background: var(--primary-deep);
-}
-button.ghost:hover:not(:disabled) {
-  border-color: var(--primary);
-  color: var(--primary-deep);
-  background: var(--primary-soft);
-}
-button.danger {
-  border-color: #eccbc8;
-  color: #b04740;
-}
-/*
- * 危险按钮 hover：深红底 + 白字。
- * 背景与文字色**必须成对给出** —— 只写背景的话，文字会继承上面的
- * #b04740（暗红）落在深红底上，对比度不足。
- */
-button.danger:hover:not(:disabled) {
-  background: var(--danger);
-  border-color: var(--danger);
-  color: #fff;
-}
-button.main.danger {
-  background: var(--danger);
-  border: none;
-  color: #fff;
-}
-button.main.danger:hover:not(:disabled) {
-  background: var(--danger-deep);
-}
-/*
- * 禁用态：只用**不透明度**表示"不可用"，但基线不能压太低。
- *
- * ## 这个值为什么是 0.55 而不是更低
- *
- * UI 审计实算过：0.55 本身已经把主色按钮上的白字压到约 2.6:1
- * （AA 正文要 4.5）。如果组件再叠一层自己的 opacity（曾经
- * CreateWizard 和 InstanceCard 各写了 .45），两层相乘 ≈ 0.25，
- * 白字对比度掉到 **1.2–1.4:1** —— 用户根本读不出按钮上写什么。
- * 而「创建」「启动」这类按钮在禁用态恰恰是最常见的状态
- * （没装运行时、正在启动中）。
- *
- * 所以规矩是：
- *   · 全局这一层保持 0.55（视觉上够"灰"了）
- *   · **组件不要再叠 opacity**，需要更明显的禁用感就换底色
- *     （CreateWizard / InstanceCard 现在都改成换底 + `opacity: 1`）
- *
- * 这条注释写给以后改样式的人：加 opacity 之前先想想叠乘。
- */
-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-/*
- * 弹窗入场动画。
- *
- * ## 为什么放在全局（而不是各组件各写一份）
- *
- * UI 审计抓出的真问题：`animation: popin ...` 在 **App.vue:1318** 和
- * **CreateWizard.vue:208** 各用了一次，但全仓库**没有一处定义
- * `@keyframes popin`** —— 于是这两处的入场动画**一直没生效**，
- * 而且是完全静默的（浏览器不报错、构建不报错、测试也不报错）。
- * 和当年 `var(--accent)` 未定义、`--ok` 未定义是同一类病。
- *
- * 两个不同组件的 scoped 样式里没法共享 keyframes（scoped 会给名字加
- * 哈希），所以定义在全局一次，两边都能用。
- *
- * ## 动效本身很克制
- *
- * 只做「轻微放大 + 淡入」，0.2s。弹窗本来就是从无到有，
- * 这一点点位移能让它不显得"啪一下跳出来"，但不会拖沓。
- * 用户明确要求过多处减少动效，所以：
- *   · 幅度很小（0.96 → 1）
- *   · prefers-reduced-motion 下整个关掉
- */
-@keyframes popin {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  /* 用户明确要求这条要生效：关掉入场缩放动画 */
-  .dlg,
-  .dlg.confirm {
-    animation: none;
-  }
-}
-/* 弹窗外壳的共用基线：遮罩 + 卡片，各组件只补尺寸差异 */
-/* 液态玻璃遮罩层 */
-.mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(24, 39, 65, 0.25);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 80;
-  backdrop-filter: blur(10px) saturate(125%);
-  -webkit-backdrop-filter: blur(10px) saturate(125%);
-  animation: mask-fade-in var(--duration-base) var(--ease-fluid);
-}
-
-@keyframes mask-fade-in {
-  from {
-    opacity: 0;
-    backdrop-filter: blur(0px) saturate(100%);
-    -webkit-backdrop-filter: blur(0px) saturate(100%);
-  }
-  to {
-    opacity: 1;
-    backdrop-filter: blur(10px) saturate(125%);
-    -webkit-backdrop-filter: blur(10px) saturate(125%);
-  }
-}
-
-/* 液态玻璃对话框 */
-.dlg {
-  position: relative;
-  isolation: isolate;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
-  border: 1px solid var(--glass-edge);
-  border-radius: 20px;
-  padding: 20px 22px 16px;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  box-shadow: var(--glass-shadow);
-  max-width: calc(100vw - 48px);
-  animation: dlg-slide-up var(--duration-slow) var(--ease-out-smooth);
-  transform-origin: center bottom;
-}
-
-@keyframes dlg-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(40px) scale(0.95);
-    filter: blur(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0px);
-  }
-}
-
-/*
- * ★ 这里原来有一条 `.dlg:hover { box-shadow: var(--glass-shadow-hover);
- *   border-color: rgba(255,255,255,1) }` —— **已删除**（主人 2026-10-08：
- *   「去掉所有弹窗鼠标悬浮的时候周围会闪光的问题」）。
- *
- * 为什么它会闪：弹窗是**居中的大块元素**，鼠标几乎必然会落在它上面；
- * 一旦进入就把阴影从 --glass-shadow 换成更大更亮的 --glass-shadow-hover，
- * 离开又换回来 —— 而光标在边缘来回移动时会**反复触发**这两个状态，
- * 表现为"周围一圈一闪一闪"。边框同时从半透明白变成纯白，更放大了闪烁感。
- *
- * 为什么不是"改慢动画"而是"直接删"：
- * 弹窗本身已经有进场动画（dlg-slide-up）承担"它出现了"的提示；
- * 悬停再发光不提供任何额外信息 —— 用户鼠标本来就在弹窗上，
- * 不需要额外确认"你指着弹窗"。这种纯装饰性的 hover 动效留着的唯一效果
- * 就是干扰阅读。判断"弹窗能不能点"靠的是按钮自身的 hover，不是整个弹窗发光。
- */
-
-.dlg .row {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
-}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.5 var(--font); color: var(--ink); background: var(--bg); }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; color: var(--ink); }
+button.main { padding: 9px 18px; border-radius: var(--radius-ctrl); border: 1px solid var(--primary); background: var(--primary); color: #fff; }
+button.ghost { padding: 9px 18px; border-radius: var(--radius-ctrl); border: 1px solid var(--hairline); background: #fff; color: var(--ink); }
+button.danger { padding: 9px 18px; border-radius: var(--radius-ctrl); border: 1px solid var(--danger); background: var(--danger); color: #fff; }
+button.main:hover:not(:disabled) { background: var(--primary-deep); }
+button.ghost:hover:not(:disabled) { background: var(--primary-soft); }
+button.danger:hover:not(:disabled) { background: var(--danger-deep); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+input, select, textarea { color: var(--ink); accent-color: #357aff; }
+input:not([type=radio]):not([type=checkbox]), select, textarea { border: 1px solid var(--hairline); border-radius: var(--radius-ctrl); background: #fff; padding: 8px 12px; }
+:focus-visible { outline: 2px solid #357aff; outline-offset: 2px; }
+a { color: #2866ce; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #dedede; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+.mask { position: fixed; inset: 0; background: rgba(0, 0, 0, .24); display: flex; align-items: center; justify-content: center; z-index: 80; }
+.dlg { background: #fff; border: 1px solid var(--hairline); border-radius: 18px; padding: 24px; box-shadow: var(--glass-shadow); max-width: calc(100vw - 48px); animation: popin 160ms ease-out; }
+.dlg .row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+@keyframes popin { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }

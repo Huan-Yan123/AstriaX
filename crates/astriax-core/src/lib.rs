@@ -6,6 +6,7 @@ pub mod domain;
 pub mod error;
 pub mod instances;
 pub mod logs;
+pub mod maintenance;
 pub mod napcat_logs;
 pub mod platform;
 pub mod platform_ports;
@@ -43,7 +44,7 @@ impl Launcher {
     pub fn open(install_dir: PathBuf, data_root: PathBuf, emit: EventSink) -> Result<Self> {
         let store = storage::Store::open(data_root)?;
         let client = reqwest::Client::builder()
-            .user_agent("AstriaX/1.0.1 Rust")
+            .user_agent(concat!("AstriaX/", env!("CARGO_PKG_VERSION"), " Rust"))
             .connect_timeout(std::time::Duration::from_secs(15))
             .timeout(std::time::Duration::from_secs(600))
             .build()?;

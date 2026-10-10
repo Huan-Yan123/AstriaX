@@ -6,6 +6,18 @@ use std::{
 };
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
+    if args.iter().any(|a| a == "-c") {
+        let exe = std::env::current_exe().unwrap();
+        let info: serde_json::Value = std::fs::read(exe.with_extension("probe.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        println!(
+            "{}",
+            serde_json::json!({"exe":exe,"version":info["version"].as_str().unwrap_or("3.12.10"),"bits":info["bits"].as_u64().unwrap_or(64),"implementation":"cpython","pip":info["pip"].as_bool().unwrap_or(true)})
+        );
+        return;
+    }
     let port = args
         .iter()
         .position(|a| a == "--port")

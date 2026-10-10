@@ -1,7 +1,7 @@
 {
   "name": "astriax",
   "productName": "AstriaX",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "AstriaX —— NapCat + AstrBot 多开管理器",
   "license": "MIT",
   "author": "梦见月下汐",
@@ -14,6 +14,7 @@
     "check:rust": "powershell -ExecutionPolicy Bypass -File scripts/with-msvc.ps1 check --workspace",
     "check:clippy": "powershell -ExecutionPolicy Bypass -File scripts/with-msvc.ps1 clippy --workspace --all-targets -- -D warnings",
     "test:desktop": "powershell -ExecutionPolicy Bypass -File scripts/tauri-smoke.ps1",
+    "test:installer": "powershell -ExecutionPolicy Bypass -File scripts/test-installer.ps1",
     "test:rust": "powershell -ExecutionPolicy Bypass -File scripts/with-msvc.ps1 test -p astriax-core -- --test-threads=1",
     "check:web": "vue-tsc --noEmit -p tsconfig.json",
     "test": "pnpm check:web && pnpm test:web && pnpm test:rust",

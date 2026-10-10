@@ -6,4 +6,6 @@ pub mod launch;
 pub mod metadata;
 mod pip;
 pub mod python;
+pub mod python_probe;
+pub mod python_selection;
 pub mod versions;

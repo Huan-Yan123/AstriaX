@@ -101,8 +101,8 @@ export interface LauncherApi {
     >
   }
   python?: {
-    status?: () => Promise<{ ready: boolean; version: string }>
-    install?: () => Promise<{ ready: boolean; version: string }>
+    status?: () => Promise<import('./python').PythonStatus>
+    install?: () => Promise<import('./python').PythonStatus>
   }
   onDownloadProgress?: (cb: (p: Progress) => void) => () => void
   /**

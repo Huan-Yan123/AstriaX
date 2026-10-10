@@ -11,12 +11,16 @@ pub async fn create(app: &Launcher, p: Value) -> Result<Value> {
     if kind == Kind::NapCat && crate::platform::qq_status()["ok"] != true {
         return Err(Error::Invalid("请先安装符合要求的 QQ NT".into()));
     }
+    if kind == Kind::AstrBot
+        && crate::runtime::python_selection::status(app, false).await?["ready"] != true
+    {
+        return Err(Error::Invalid(
+            "请先选择可用的 Python 3.12 或更高版本".into(),
+        ));
+    }
     let mut store = app.store.lock().await;
     if store.config["dataRoot"].as_str().is_none() {
         return Err(Error::Invalid("请先完成数据目录设置".into()));
-    }
-    if kind == Kind::AstrBot && !crate::runtime::python::exe(&store.root).is_file() {
-        return Err(Error::Invalid("请先安装内置 Python".into()));
     }
     let versions = store.runtimes()?;
     let chosen = if let Some(tag) = p["tag"].as_str() {

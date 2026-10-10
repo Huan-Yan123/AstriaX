@@ -433,35 +433,21 @@ function submit(): void {
   align-items: center;
   justify-content: center;
   z-index: 80;
-  backdrop-filter: blur(10px) saturate(125%);
-  -webkit-backdrop-filter: blur(10px) saturate(125%);
+
 }
 .dlg {
   width: 380px;
   max-width: calc(100vw - 48px);
-  /*
-   * ★ 高度上限 + 滚动（审查抓出的真机阻断）
-   *
-   * 场景：「换个版本」的选项来自源上（AstrBot 走 PyPI，**实测 168 个版本**），
-   * 而按钮区是 `v-for` 全量渲染。原来这里没有 max-height / overflow，
-   * 于是 169 个按钮把弹窗顶出视口 —— 用户**点不到也关不掉**。
-   *
-   * 这里加的是通用防御（任何多选项弹窗都受益）：
-   *   · 弹窗最多占 80% 视口高
-   *   · 主体区超出就滚动
-   * 另外调用方（App.vue 的 pickVersion）也会**只列最近 N 个**，
-   * 两层一起保证不会再出现"一屏几百个按钮"。
-   */
+
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  background: var(--card-a);
   border: 1px solid var(--glass-edge);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
+
   border-radius: 20px;
   padding: 22px 24px 18px;
-  box-shadow: 0 24px 64px rgba(19, 37, 70, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow: none;
 }
 h3 {
   margin: 0 0 8px;
@@ -494,8 +480,8 @@ h3 {
   padding: 9px 12px;
   font-size: 13.5px;
   font-family: inherit;
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: var(--card-a);
+
   outline: none;
 }
 .f input:focus {
@@ -509,40 +495,21 @@ h3 {
 .row {
   display: flex;
   justify-content: flex-end;
-  /*
-   * 选项多的时候要能换行（否则会横向挤出弹窗）
-   * —— 配合上面的 max-height + overflow-y，「换版本」那种多选项也能用。
-   */
+
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 16px;
-  /*
-   * 按钮区自己也滚动（选项可能在按钮里，如 chooseOne 的多选项）。
-   * 放在这里而不是只给 body：chooseOne 的选项就是按钮本身。
-   */
+
   overflow-y: auto;
   max-height: 52vh;
 }
 
-/* ══════════════════════════════════════════════════════════════════════════
- * ★★ 折叠选择器（换版本那种多选项）
- * ══════════════════════════════════════════════════════════════════════════
- *
- * 界面评审前的样子：十几个版本按钮清一色实心蓝、糊成一片，
- * 「取消」混在同一排，末尾还落单右对齐 —— 看不出哪个是当前版本。
- * 中间版本：铺成列表（一行一项、当前项打勾），但 12 项仍占大半屏。
- * 现在（主人追问「为什么不是折叠列表」）：**默认收起，点开才展开**。
- *
- * 视觉层次靠**形状**而不是颜色堆叠：
- *   收起态 = 一个输入框样子的触发器（系统下拉框的通用语言）
- *   展开态 = 候选列表，当前项打勾 + 浅底，其余是描边
- */
 .picker {
   margin-top: 14px;
   position: relative;
 }
-/* 收起态的触发器：长得像输入框，一眼知道"这里能选" */
+
 .picked {
   display: flex;
   align-items: center;
@@ -552,7 +519,7 @@ h3 {
   padding: 9px 12px;
   border-radius: 10px;
   border: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.64);
+  background: var(--card-a);
   color: var(--ink);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -564,7 +531,7 @@ h3 {
 .picked:hover {
   border-color: var(--primary);
 }
-/* 展开时触发器保持高亮，让"谁被展开了"一目了然 */
+
 .picker.open .picked {
   border-color: var(--primary);
   background: rgba(221, 233, 255, 0.72);
@@ -580,14 +547,10 @@ h3 {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  /*
-   * 自己滚动：候选可能有几十个（实测 NapCat 源上 30 个版本）。
-   * 用 38vh 而不是更大：它是弹窗里的一个**局部**面板，
-   * 不该把弹窗撑到接近满屏（那样又回到"一大片"的观感了）。
-   */
+
   max-height: 38vh;
   overflow-y: auto;
-  /* 滚动条不占位，避免内容左右跳一下 */
+
   scrollbar-gutter: stable;
 }
 .choice {
@@ -595,15 +558,15 @@ h3 {
   align-items: center;
   gap: 10px;
   width: 100%;
-  /* 左对齐 + 等宽：列表要的是"扫视对齐"，不是"按钮居中" */
+
   text-align: left;
   padding: 9px 12px;
   border-radius: 10px;
   border: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.56);
+  background: var(--card-a);
   color: var(--ink);
   font-size: 13px;
-  font-variant-numeric: tabular-nums; /* 版本号数字等宽，上下对齐 */
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition:
     border-color 0.14s ease,
@@ -613,29 +576,19 @@ h3 {
   border-color: var(--primary);
   background: rgba(221, 233, 255, 0.72);
 }
-/*
- * 当前正在用的那个：实底 + 勾。
- * 用主色调的浅色底而不是纯实心蓝 —— 它是"状态标记"，不是"主操作按钮"，
- * 太抢眼会把用户的注意力从"我要选哪个新的"上拉走。
- */
+
 .choice.on {
   border-color: var(--primary);
   background: rgba(210, 227, 255, 0.8);
   color: var(--primary-deep);
   font-weight: 600;
 }
-/*
- * 当前正在用的那个：浅底 + 边线，与"已选中"（打勾）区分开。
- *
- * 注意这里**不再用 `.choice.on` 表示"当前"** —— 那个类现在表示"已选中待确认"。
- * 两者是不同信息，混用一个样式会让用户分不清
- *「我要换成它」和「现在就是它」。
- */
+
 .choice.current {
   border-color: #cbd6ea;
   background: rgba(242, 247, 255, 0.62);
 }
-/* 「当前」小标签：只在文字里区分，不另加一套视觉 */
+
 .nowtag {
   flex: 0 0 auto;
   font-size: 11px;
@@ -644,10 +597,10 @@ h3 {
   border: 1px solid var(--hairline);
   border-radius: 6px;
   padding: 1px 6px;
-  background: rgba(255, 255, 255, 0.58);
+  background: var(--card-a);
 }
 .tick {
-  /* 固定宽度：有勾和没勾的项，文字起始位置要一样 */
+
   width: 14px;
   flex: 0 0 14px;
   text-align: center;
@@ -661,7 +614,7 @@ h3 {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 展开动画：轻微下滑淡入，呼应"下拉"的心理模型 */
+
 .droplist-enter-active,
 .droplist-leave-active {
   transition:
@@ -678,8 +631,8 @@ h3 {
   padding: 8px 18px;
   font-size: 13px;
   border: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: var(--card-a);
+
   color: var(--ink-soft);
   transition: all 0.14s ease;
 }
@@ -700,17 +653,13 @@ h3 {
   border-color: var(--primary);
   color: var(--primary-deep);
 }
-/*
- * 禁用态要**看得出来是禁用的**（灰 + 不许点），
- * 而不是"一个点不动的蓝块"——后者会让用户以为界面坏了。
- * 配合 title 里那句人话（见 confirmHint），用户知道"要先选一个"。
- */
+
 .btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
 .btn.main:disabled:hover {
-  /* 禁用时悬停不变色，避免"看起来能点" */
+
   background: var(--primary);
 }
 .maskfade-enter-active,

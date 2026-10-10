@@ -11,6 +11,8 @@ fn prepare(args: &[String]) -> Result<()> {
     }
     let installer = Path::new(&args[1]);
     let version = astriax_core::domain::segment(&args[2])?;
+    semver::Version::parse(version)
+        .map_err(|_| Error::Invalid("发布版本必须为有效 SemVer".into()))?;
     let name = installer
         .file_name()
         .and_then(|s| s.to_str())
@@ -18,8 +20,7 @@ fn prepare(args: &[String]) -> Result<()> {
     if !name.ends_with(".exe") || !installer.is_file() {
         return Err(Error::Invalid("请选择 Tauri 安装包 exe".into()));
     }
-    let mut url =
-        reqwest::Url::parse("https://github.com/Huan-Yan123/AstriaX/releases/download/").unwrap();
+    let mut url = reqwest::Url::parse(astriax_core::distribution::RELEASES).unwrap();
     url.path_segments_mut()
         .unwrap()
         .pop_if_empty()

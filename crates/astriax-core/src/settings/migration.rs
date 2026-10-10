@@ -104,6 +104,9 @@ async fn migrate(app: &Launcher, target: PathBuf, task: &crate::tasks::Task) -> 
         &app.install_dir.join("data-root.txt"),
         target.to_string_lossy().as_bytes(),
     )?;
+    if crate::maintenance::paths::sync_root(&app.install_dir, &target).is_err() {
+        let _ = crate::logs::audit(&target, "installer:registry-sync-failed", false);
+    }
     *app.store.lock().await = next;
     Ok(json!({"ok":true,"dataRoot":target,"oldDataRoot":source,"oldDataRetained":true}))
 }

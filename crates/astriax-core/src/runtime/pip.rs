@@ -17,6 +17,7 @@ pub async fn install_pip(app: &Launcher, p: Value) -> Result<Value> {
     let task = app.tasks.runtime(Kind::AstrBot, tag, app.emit.clone())?;
     let result = async {
         assert_unused(app, Kind::AstrBot, tag).await?;
+        let _python = app.python_gate.read().await;
         let spec = arg_string(&p, "packageSpec")?;
         if spec.len() > 1024 || spec.starts_with('-') || spec.contains(['\n', '\r', '\0']) {
             return Err(Error::Invalid("请填写一个有效的 pip 包规格".into()));
@@ -26,6 +27,7 @@ pub async fn install_pip(app: &Launcher, p: Value) -> Result<Value> {
         if !runtime_ready(Kind::AstrBot, &dir) {
             return Err(Error::Invalid("指定运行时尚未安装".into()));
         }
+        super::python_selection::compatible(&root, &dir).await?;
         let stage = tempfile::Builder::new()
             .prefix(".pip-")
             .tempdir_in(dir.parent().unwrap())?;
@@ -46,9 +48,8 @@ pub async fn install_pip(app: &Launcher, p: Value) -> Result<Value> {
             arg_string(&source, "indexUrl")?.into(),
             spec.into(),
         ];
-        let _python = app.python_gate.read().await;
         run(
-            &super::python::pip_spec(&root, &payload, args)?,
+            &super::python::pip_spec(&root, &payload, args).await?,
             &task.token,
             &root.join("logs/pip-install.log"),
         )

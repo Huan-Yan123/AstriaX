@@ -2,6 +2,7 @@ mod commands;
 mod lifecycle;
 #[cfg(debug_assertions)]
 mod smoke;
+mod update;
 mod webui;
 
 use astriax_core::{storage, Launcher};
@@ -52,6 +53,7 @@ pub fn run() {
                 .or(pointer)
                 .unwrap_or_else(|| install.join("data"));
             let handle = app.handle().clone();
+            astriax_core::maintenance::check_startup(&root)?;
             let launcher = Launcher::open(
                 install,
                 root,

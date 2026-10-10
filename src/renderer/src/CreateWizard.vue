@@ -23,7 +23,7 @@ const err = ref('')
 
 const defaultPort = ref<number | null>(null)
 const installed = ref<Array<{ type: 'a' | 'n'; tag: string; sizeMB?: number }>>([])
-/** AstrBot 必须有内置 Python 才跑得起来（没装就是创建了也起不来） */
+/** AstrBot 需要通过检测的 Python 3.12+ 解释器。 */
 const pyReady = ref(true)
 /**
  * 读版本列表失败的原因（空 = 没失败）。
@@ -45,7 +45,7 @@ declare const window: {
 /** 当前类型已下载的版本（新版本在前，仓库层已排好序） */
 const myVersions = computed(() => installed.value.filter((v) => v.type === props.defaultType))
 
-/** AstrBot 依赖内置 Python；NapCat 的运行方式由上游 QQ 集成适配处理。 */
+/** AstrBot 依赖已验证的 Python 3.12+；NapCat 的运行方式由上游 QQ 集成适配处理。 */
 const needsPython = computed(() => props.defaultType === 'a')
 const pythonMissing = computed(() => needsPython.value && !pyReady.value)
 
@@ -99,7 +99,7 @@ const nameHint = computed(() => `${props.defaultType === 'a' ? 'AstrBot' : 'NapC
 
 function submit(): void {
   if (pythonMissing.value) {
-    err.value = 'AstrBot 需要先安装 Python 才能运行哦，请到「下载」页安装呀。'
+    err.value = 'AstrBot 需要 Python 3.12 或更高版本，请到「资源与环境」中检测或指定解释器。'
     return
   }
   if (!myVersions.value.length) {
@@ -180,7 +180,7 @@ function goDownload(): void {
 
       <!-- AstrBot 缺 Python：这是跑不起来的前置条件，必须先拦住 -->
       <div v-if="pythonMissing" class="blocked">
-        <span>AstrBot 需要先安装 Python 才能运行呢</span>
+        <span>AstrBot 需要可用的 Python 3.12 或更高版本</span>
         <button class="go" type="button" @click="goDownload">去下载页</button>
       </div>
 
@@ -211,7 +211,7 @@ function goDownload(): void {
         <button
           class="main"
           :disabled="busy || !canCreate"
-          :title="busy ? '正在创建中，等它一下呀' : canCreate ? '' : pythonMissing ? '得先安装 Python 哦' : loadErr ? loadErr : '得先下载一个版本哦'"
+          :title="busy ? '正在创建中，等它一下呀' : canCreate ? '' : pythonMissing ? '请先配置 Python 3.12+' : loadErr ? loadErr : '得先下载一个版本哦'"
           @click="submit"
         >
           {{ busy ? '创建中…' : '创建' }}

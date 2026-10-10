@@ -18,13 +18,18 @@ pub fn spec(root: &Path, rec: &Instance, runtime: &Path, qq: Option<&str>) -> Re
         Kind::AstrBot => {
             let program = super::python::exe(root);
             if !program.is_file() {
-                return Err(Error::Invalid("内置 Python 尚未安装".into()));
+                return Err(Error::Invalid(
+                    "Python 解释器不可用，请在资源与环境中重新检测或指定路径".into(),
+                ));
             }
-            super::python::prepare(program.parent().unwrap())?;
+            let external = program != super::python_selection::bundled(root);
+            if !external {
+                super::python::prepare(program.parent().unwrap())?;
+            }
             if !instance.join(".astrbot").exists() {
                 crate::storage::atomic_bytes(&instance.join(".astrbot"), b"")?;
             }
-            let args = if runtime.join("main.py").is_file() {
+            let mut args = if runtime.join("main.py").is_file() {
                 vec![
                     runtime.join("main.py").to_string_lossy().into_owned(),
                     "--port".into(),
@@ -39,6 +44,27 @@ pub fn spec(root: &Path, rec: &Instance, runtime: &Path, qq: Option<&str>) -> Re
                     rec.port.to_string(),
                 ]
             };
+            if external {
+                let (mode, entry) = if runtime.join("main.py").is_file() {
+                    ("file", args.remove(0))
+                } else {
+                    args.drain(..2);
+                    ("module", "astrbot.cli".into())
+                };
+                let mut prefix = vec![
+                    "-X".into(),
+                    "utf8".into(),
+                    "-u".into(),
+                    "-I".into(),
+                    "-c".into(),
+                    include_str!("../../resources/python-launch.py").into(),
+                    runtime.to_string_lossy().into_owned(),
+                    mode.into(),
+                    entry,
+                ];
+                prefix.extend(args);
+                args = prefix;
+            }
             Ok(LaunchSpec {
                 program,
                 args,

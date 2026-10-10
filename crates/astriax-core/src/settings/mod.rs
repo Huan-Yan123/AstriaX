@@ -44,6 +44,9 @@ pub async fn set(app: &Launcher, p: Value) -> Result<Value> {
         &app.install_dir.join("data-root.txt"),
         store.root.to_string_lossy().as_bytes(),
     )?;
+    if crate::maintenance::paths::sync_root(&app.install_dir, &store.root).is_err() {
+        let _ = crate::logs::audit(&store.root, "installer:registry-sync-failed", false);
+    }
     Ok(config)
 }
 

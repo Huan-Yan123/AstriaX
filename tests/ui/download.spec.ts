@@ -344,7 +344,7 @@ describe('下载页', () => {
     await flushPromises()
     await flushPromises()
     expect(w.text()).toContain('未安装')
-    const b = w.findAll('button').find((x) => x.text() === '安装')!
+    const b = w.findAll('button').find((x) => x.text() === '下载独立 Python')!
     await b.trigger('click')
     await flushPromises()
     await flushPromises()

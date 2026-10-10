@@ -20,7 +20,7 @@ function minimize(): void {
 async function toggleMaximize(): Promise<void> {
   const api = windowApi()
   if (!api?.toggleMaximize) return
-  
+
   await api.toggleMaximize()
   isMaximized.value = await api.isMaximized?.() ?? false
 }
@@ -38,7 +38,7 @@ onMounted(async () => {
   if (api?.isMaximized) {
     isMaximized.value = await api.isMaximized()
   }
-  
+
   // 订阅最大化状态变化
   if (api?.onMaximizeChange) {
     unsubscribe = api.onMaximizeChange((maximized: boolean) => {
@@ -62,8 +62,8 @@ onUnmounted(() => {
 
     <!-- 窗口控制按钮（禁用拖拽） -->
     <div class="titlebar__controls">
-      <button 
-        class="titlebar__btn titlebar__btn--minimize" 
+      <button
+        class="titlebar__btn titlebar__btn--minimize"
         @click="minimize"
         title="最小化"
       >
@@ -71,9 +71,9 @@ onUnmounted(() => {
           <rect x="0" y="5" width="12" height="2" rx="1" />
         </svg>
       </button>
-      
-      <button 
-        class="titlebar__btn titlebar__btn--maximize" 
+
+      <button
+        class="titlebar__btn titlebar__btn--maximize"
         @click="toggleMaximize"
         :title="isMaximized ? '还原' : '最大化'"
       >
@@ -84,9 +84,9 @@ onUnmounted(() => {
           <path d="M3 1h7a1 1 0 011 1v7M1 5v6a1 1 0 001 1h6a1 1 0 001-1V5a1 1 0 00-1-1H2a1 1 0 00-1 1z" fill="none" stroke="currentColor" stroke-width="1.5" />
         </svg>
       </button>
-      
-      <button 
-        class="titlebar__btn titlebar__btn--close" 
+
+      <button
+        class="titlebar__btn titlebar__btn--close"
         @click="close"
         title="关闭"
       >
@@ -99,96 +99,13 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.titlebar {
-  display: flex;
-  align-items: center;
-  height: 40px;
-  padding: 0 8px 0 16px;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.88) 0%,
-    rgba(242, 247, 253, 0.75) 100%
-  );
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border-bottom: 1px solid rgba(220, 228, 241, 0.6);
-  position: relative;
-  z-index: 100;
-}
-
-/* 可拖拽区域 */
-.titlebar__drag {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  -webkit-app-region: drag;
-  user-select: none;
-}
-
-.titlebar__logo {
-  width: 20px;
-  height: 20px;
-  opacity: 0.92;
-}
-
-.titlebar__title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--primary-deep, #1e4388);
-  letter-spacing: 0.01em;
-}
-
-/* 窗口控制按钮 */
-.titlebar__controls {
-  display: flex;
-  gap: 8px;
-  -webkit-app-region: no-drag;
-}
-
-.titlebar__btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  border-radius: 6px;
-  color: var(--ink-soft, #586780);
-  cursor: pointer;
-  transition: all var(--duration-fast, 180ms) var(--ease-fluid, cubic-bezier(0.4, 0, 0.2, 1));
-  position: relative;
-  isolation: isolate;
-}
-
-.titlebar__btn:hover {
-  background: rgba(40, 88, 168, 0.1);
-  color: var(--primary-deep, #1e4388);
-}
-
-.titlebar__btn:active {
-  transform: scale(0.92);
-  background: rgba(40, 88, 168, 0.15);
-}
-
-/* 关闭按钮特殊样式 */
-.titlebar__btn--close:hover {
-  background: #e81123;
-  color: #fff;
-}
-
-.titlebar__btn--close:active {
-  background: #c20a1a;
-}
-
-/* SVG 图标 */
-.titlebar__btn svg {
-  display: block;
-  transition: opacity var(--duration-fast, 180ms) ease;
-}
-
-.titlebar__btn:hover svg {
-  opacity: 1;
-}
+.titlebar { flex: 0 0 44px; display: flex; align-items: center; height: 44px; background: var(--bg); user-select: none; position: relative; z-index: 100; }
+.titlebar__drag { flex: 1; height: 100%; display: flex; align-items: center; gap: 10px; padding-left: 20px; -webkit-app-region: drag; }
+.titlebar__logo { width: 20px; height: 20px; }
+.titlebar__title { font-size: 13px; color: var(--ink-soft); }
+.titlebar__controls { display: flex; height: 100%; -webkit-app-region: no-drag; }
+.titlebar__btn { width: 46px; height: 100%; display: grid; place-items: center; border: 0; border-radius: 0; background: transparent; color: var(--ink); }
+.titlebar__btn:hover { background: #e1e1e1; }
+.titlebar__btn--close:hover { background: #c42b1c; color: #fff; }
+.titlebar__btn svg { display: block; }
 </style>

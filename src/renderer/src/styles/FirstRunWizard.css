@@ -2,8 +2,7 @@
   position: fixed;
   inset: 0;
   background: rgba(24, 39, 65, 0.25);
-  -webkit-backdrop-filter: blur(10px) saturate(125%);
-  backdrop-filter: blur(10px) saturate(125%);
+
   display: flex;
   align-items: center;
   justify-content: center;
@@ -13,20 +12,15 @@
   isolation: isolate;
   width: 430px;
   max-width: calc(100vw - 36px);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  background: var(--card-a);
   border: 1px solid var(--glass-edge);
   border-radius: 20px;
   padding: 26px 28px 22px;
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
-  box-shadow: 0 24px 64px rgba(19, 37, 70, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  box-shadow: none;
   overflow: hidden;
 }
-/*
- * 右上角一团很淡的主色调光晕，给声明页一点「封面感」。
- * 用 radial-gradient 而不是贴图：不额外引入资源，也不受打包路径影响。
- * 强度压得很低（0.10 → 透明），避免变成「一眼 AI 味」的渐变卡片。
- */
+
 .dlg::before {
   content: '';
   position: absolute;
@@ -35,7 +29,7 @@
   width: 190px;
   height: 190px;
   border-radius: 50%;
-  background: radial-gradient(circle, var(--primary-soft) 0%, rgba(255, 255, 255, 0) 70%);
+  background: var(--card-a);
   opacity: 0.9;
   pointer-events: none;
 }
@@ -75,11 +69,7 @@ h2 {
   color: var(--ink);
   font-weight: 600;
 }
-/*
- * 「被人倒卖」那段要有分量，但不能用报错的红色 ——
- * 红色在这个软件里已经专属给「出错了」，拿来做普通强调会误导。
- * 改成左侧一道主色竖线：既突出，又和错误态区分开。
- */
+
 .warn {
   border-left: 2px solid var(--primary);
   padding-left: 10px;
@@ -126,7 +116,7 @@ h2 {
   font-family: inherit;
   cursor: pointer;
 }
-/* 拿不到路径时按钮是灰的：让人一眼看出「现在点不了」而不是「点了没用」 */
+
 .main:disabled {
   background: var(--hairline);
   color: var(--ink-soft);
@@ -139,8 +129,8 @@ h2 {
 .retry {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-ctrl);
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: var(--card-a);
+
   color: var(--ink);
   padding: 12px 18px;
   font-size: 13.5px;

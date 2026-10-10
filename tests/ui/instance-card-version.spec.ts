@@ -85,8 +85,8 @@ describe('★ 实例卡片：版本号的位置', () => {
     const h3 = /h3\s*\{([\s\S]*?)\}/.exec(CARD)
     expect(h3, '找不到 h3 样式').toBeTruthy()
     expect(
-      /flex\s*:\s*1\s+1\s+auto|flex\s*:\s*1(;|\s)/.test(h3![1]),
-      'h3 没有设成可伸缩（flex:1 1 auto）——\n' +
+      /flex\s*:\s*0\s+1\s+auto/.test(h3![1]),
+      'h3 必须可收缩且不扩张（flex:0 1 auto）——\n' +
         '那样长名字会把版本标挤出可视范围，而不是自己显示省略号'
     ).toBe(true)
     expect(

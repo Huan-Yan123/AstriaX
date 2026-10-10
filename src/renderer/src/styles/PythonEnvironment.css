@@ -1,0 +1,15 @@
+.python-environment { padding: 22px 0 4px; }
+.python-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.python-heading h3 { font-size: 15px; margin: 0 0 5px; font-weight: 600; }
+.python-heading p, .python-note { font-size: 13px; color: var(--ink-soft); margin: 0; line-height: 1.6; }
+.python-status { white-space: nowrap; color: var(--ink-soft); padding: 6px 10px; background: var(--bg); border-radius: 8px; font-size: 12px; }
+.python-status.ready { color: var(--mint); }
+.python-path { display: block; margin: 16px 0; font-size: 13px; }
+.python-path > span { display: block; margin-bottom: 7px; }
+.python-path > div, .python-actions { display: flex; align-items: center; gap: 8px; }
+.python-path input { flex: 1; min-width: 0; font-family: Consolas, 'Microsoft YaHei UI', monospace; }
+.python-actions { flex-wrap: wrap; margin: 0 0 12px; }
+.python-path button, .python-actions button { flex:none; padding:8px 13px; border:1px solid var(--hairline); border-radius:10px; background:#fff; color:var(--ink); }
+.python-path button:hover:not(:disabled), .python-actions button:hover:not(:disabled) { background:var(--primary-soft); }
+.python-error { font-size: 13px; color: var(--danger); margin: 10px 0; }
+@media (max-width: 850px) { .python-heading { align-items: flex-start; flex-direction: column; } }

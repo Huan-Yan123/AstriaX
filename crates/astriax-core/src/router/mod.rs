@@ -86,6 +86,7 @@ pub async fn dispatch(app: &Launcher, channel: &str, p: Value) -> Result<Value> 
         }
         "app:checkUpdate" => crate::updater::check(app, p).await,
         "app:downloadUpdate" => crate::updater::download(app, p).await,
+        "app:pendingUpdate" => crate::updater::pending(&app.root().await),
         "app:skipVersion" => {
             let mut s = app.store.lock().await;
             s.config["skippedAppVersion"] = json!(segment(string(&p)?)?);

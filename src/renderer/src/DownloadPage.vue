@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PythonEnvironment from './components/PythonEnvironment.vue'
+import type { PythonStatus } from './types/python'
 import { usePythonSources } from './composables/usePythonSources'
 
 import { useGithubSources } from './composables/useGithubSources'
@@ -37,7 +39,7 @@ const api = (): LauncherApi => ((window as unknown as { launcher?: LauncherApi }
 
 const state = ref<MirrorState | null>(null)
 const runtimes = ref<RuntimeVersion[]>([])
-const py = ref<{ ready: boolean; version: string } | null>(null)
+const py = ref<PythonStatus | null>(null)
 /**
  * 进度按任务分别记：同时装 Python + AstrBot + NapCat 时，
  * 之前只有一个 progress 变量，后开始的会把先开始的覆盖掉，
@@ -242,7 +244,7 @@ function openQQDownload(): void {
 }
 
 /** 资源页项目主页，通过桌面接口在系统浏览器中打开。 */
-const GITHUB_REPO_URL = 'https://github.com/Huan-Yan123/AstriaX'
+const GITHUB_REPO_URL = 'https://github.com/Soffd/AstriaX'
 
 const OFFICIAL_GROUP = '1077554004'
 
@@ -381,6 +383,12 @@ async function installPython(): Promise<void> {
   } finally {
     pyBusy.value = false
   }
+}
+async function pythonChanged(status: PythonStatus): Promise<void> {
+  py.value = status
+  dlInvalidate({ keepProbe: true })
+  await reload()
+  await loadEnvironment()
 }
 
 /**
@@ -527,7 +535,7 @@ onUnmounted(() => {
           </span>
           <p>
             代码全部公开在 GitHub。感谢每一位用过它、报过问题的人 ——
-            觉得好用的话，去 <a class="repo-link" :href="GITHUB_REPO_URL" title="在浏览器里打开项目主页" @click.prevent="openGithub">github.com/Huan-Yan123/AstriaX</a>
+            觉得好用的话，去 <a class="repo-link" :href="GITHUB_REPO_URL" title="在浏览器里打开项目主页" @click.prevent="openGithub">github.com/Soffd/AstriaX</a>
             点个 <em>Star</em> 吧，那是对这个项目最实在的支持，也能让更多需要它的人找到这里。
           </p>
         </div>
@@ -551,7 +559,7 @@ onUnmounted(() => {
         <div class="flow-guide">
           <span class="repo-head"><b>使用流程</b></span>
           <ol>
-            <li>本页上方先装<b>运行环境</b>：AstrBot 需要内置 Python；NapCat 要本机有新版 QQNT。</li>
+            <li>本页上方先装<b>运行环境</b>：AstrBot 需要 Python 3.12+；NapCat 要本机有新版 QQNT。</li>
             <li>在<b>下载资源</b>里选一个可用的源，装上要用的版本（灰色按钮的源不通，换一个）。</li>
             <li>去<b>实例</b>页新建一个实例，选刚装好的版本。</li>
             <li>点<b>启动</b>，等状态变成"运行中"（NapCat 要等注入 QQ，十几秒）。</li>
@@ -598,9 +606,10 @@ onUnmounted(() => {
             <div class="environment-cell"><span>处理器</span><b :title="environment?.cpu">{{ environment?.cpu ?? '检测中…' }}</b></div>
             <div class="environment-cell"><span>显卡</span><b :title="environment?.gpu">{{ environment?.gpu ?? '检测中…' }}</b></div>
             <div class="environment-cell"><span>内存</span><b>{{ environment ? `${environment.memoryUsed} / ${environment.memory}` : '检测中…' }} <small>可用 {{ environment?.memoryFree ?? '—' }}</small></b></div>
-            <div class="environment-cell"><span>Python</span><b class="env-stack"><i :class="{ good: py?.ready }" />{{ environment?.python ?? '检测中…' }}</b><button v-if="!py?.ready" class="row-action primary env-action" :disabled="pyBusy" @click="installPython">{{ pyBusy ? '安装中' : '安装' }}</button></div>
+            <div class="environment-cell"><span>Python</span><b class="env-stack"><i :class="{ good: py?.ready }" />{{ environment?.python ?? '检测中…' }}</b></div>
             <div class="environment-cell"><span>QQ</span><b class="env-stack" :title="qq?.reason"><i :class="{ good: qq?.ok }" />{{ environment?.qq ?? '未检测' }}</b><div class="env-actions"><button v-if="qq && !qq.ok" class="row-action primary env-action" @click="openQQDownload">下载 QQ</button></div></div>
           </div>
+          <PythonEnvironment :status="py" :downloading="pyBusy" @changed="pythonChanged" @download="installPython" />
         </section>
 
         <section class="resource-section source-section">
@@ -665,7 +674,7 @@ onUnmounted(() => {
     <Transition name="pop"><div v-if="needPython" class="mask" @click.self="needPython = null"><div class="dlg small">
       <h2>要先装 Python 呀</h2>
       <p class="sub">
-        AstrBot 是 Python 程序，得靠内置 Python 来安装。
+        AstrBot 需要可用的 Python 3.12+。可在运行环境中自动检测、指定路径或下载安装。
         装好之后回来再点「下载」，就能挑版本了。
       </p>
       <div class="row">

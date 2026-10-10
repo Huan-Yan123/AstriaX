@@ -42,6 +42,7 @@ pub(super) async fn start_with_task(
             return Err(Error::Invalid("运行时缺少上游入口，需重新安装".into()));
         }
         if rec.kind == Kind::AstrBot {
+            crate::runtime::python_selection::compatible(&root, &runtime).await?;
             crate::runtime::dashboard::ensure(app, Path::new(&rec.dir), &tag, task).await?;
         }
         let qq = if rec.kind == Kind::NapCat {

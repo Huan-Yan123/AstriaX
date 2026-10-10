@@ -9,7 +9,7 @@ import { dlInvalidate } from '../../src/renderer/src/dl-cache'
  *
  * 主人原话：
  *   「在资源页左侧超链这个 GitHub 链接
- *     https://github.com/Huan-Yan123/AstriaX 并写感谢以及要 Star 的文案」
+ *     https://github.com/Soffd/AstriaX 并写感谢以及要 Star 的文案」
  *
  * 这里钉三件事：
  *   ① 链接**确实是**那个仓库地址（不能写错 owner/repo）
@@ -18,7 +18,7 @@ import { dlInvalidate } from '../../src/renderer/src/dl-cache'
  *   ③ 文案里真的提到了 Star（主人明确要求的）
  */
 
-const GITHUB_URL = 'https://github.com/Huan-Yan123/AstriaX'
+const GITHUB_URL = 'https://github.com/Soffd/AstriaX'
 
 let opened: string[] = []
 
@@ -77,7 +77,7 @@ describe('★ 资源页左侧：项目主页求 Star', () => {
     const link = w.find('a.repo-link')
     expect(link.exists(), '应当是一个真正的 <a> 超链接（不是 button）').toBe(true)
     expect(link.attributes('href'), 'href 要指向仓库').toBe(GITHUB_URL)
-    expect(link.text(), '链接文字就是地址').toContain('github.com/Huan-Yan123/AstriaX')
+    expect(link.text(), '链接文字就是地址').toContain('github.com/Soffd/AstriaX')
 
     const note = w.find('.repo-note')
     expect(note.text().toLowerCase(), '要包含 Star 的请求（主人明确要求）').toContain('star')
@@ -113,8 +113,8 @@ describe('★ 资源页左侧：项目主页求 Star', () => {
     const fs = await import('node:fs')
     const path = await import('node:path')
     const distribution = fs.readFileSync(path.join(process.cwd(), 'crates/astriax-core/src/distribution.rs'), 'utf8')
-    const base = /MANIFEST_BASE: &str = "([^"]+)"/.exec(distribution)?.[1]
-    expect(base).toBe('https://raw.githubusercontent.com/Huan-Yan123/AstriaX/main/')
+    const base = /MANIFEST_URL: &str =\s*"([^"]+)"/.exec(distribution)?.[1]
+    expect(base).toBe('https://github.com/Soffd/AstriaX/releases/latest/download/tauri-latest.json')
     inject()
     const w = mount(DownloadPage)
     await flushPromises()

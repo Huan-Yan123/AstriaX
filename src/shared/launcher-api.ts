@@ -86,7 +86,10 @@ export const createLauncherApi = (transport: LauncherTransport) => ({
   },
   python: {
     status: () => transport.invoke('python:status'),
-    install: () => transport.invoke('python:install')
+    install: () => transport.invoke('python:install'),
+    discover: () => transport.invoke('python:discover'),
+    select: (path: string) => transport.invoke('python:select', path),
+    pickFile: () => transport.invoke('python:pickFile')
   },
   onDownloadProgress: (cb: (p: unknown) => void) => {
     const handler = (_e: unknown, p: unknown): void => cb(p)
@@ -118,6 +121,8 @@ export const createLauncherApi = (transport: LauncherTransport) => ({
     qqStatus: () => transport.invoke('qq:status'),
     openExternal: (url: string) => transport.invoke('app:openExternal', url),
     version: () => transport.invoke('app:version'),
+    installUpdate: () => transport.invoke('app:installUpdate'),
+    pendingUpdate: () => transport.invoke('app:pendingUpdate'),
     lastCrash: () => transport.invoke('app:lastCrash'),
     checkUpdate: (p?: { force?: boolean }) => transport.invoke('app:checkUpdate', p),
     downloadUpdate: (p: { url: string; version: string; sha256?: string }) =>

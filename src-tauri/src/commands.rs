@@ -75,13 +75,18 @@ pub async fn launcher_request(
             }
             Ok(Value::Null)
         }
-        "dialog:pickDataDir" | "runtimes:pickFile" => {
+        "dialog:pickDataDir" | "runtimes:pickFile" | "python:pickFile" => {
             let folder = channel == "dialog:pickDataDir";
+            let python = channel == "python:pickFile";
             let handle = app.clone();
             let selected = tauri::async_runtime::spawn_blocking(move || {
                 let picker = handle.dialog().file();
                 if folder {
                     picker.blocking_pick_folder()
+                } else if python {
+                    picker
+                        .add_filter("Python 解释器", &["exe"])
+                        .blocking_pick_file()
                 } else {
                     picker
                         .add_filter("运行时压缩包", &["zip", "whl"])
@@ -133,6 +138,7 @@ pub async fn launcher_request(
             .collect::<Vec<_>>())),
         "webui:visible" => Ok(json!(state.visible.lock().unwrap().clone())),
         "app:lastCrash" => Ok(state.last_crash.clone()),
+        "app:installUpdate" => crate::update::install(&app).await,
         _ => {
             let id = match channel.as_str() {
                 "instance:stop" | "instance:remove" => payload.as_str().map(str::to_string),

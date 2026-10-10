@@ -15,8 +15,6 @@ import TitleBar from './components/TitleBar.vue'
 // 搬家后要整份清掉下载页的 SWR 缓存（它存的数据都跟着数据根走）
 import { dlInvalidate } from './dl-cache'
 // 顶部标题栏品牌标记：复用软件图标，避免侧栏再重复显示一次。
-import astriaxLogo from './assets/astriax-logo.png'
-import cornerMascot from './assets/mascot-corner.png'
 import instanceMascot from './assets/mascot-instance-empty.png'
 import installMascot from './assets/mascot-runtime-missing.png'
 import { desktopError } from './platform/desktop-errors'
@@ -47,6 +45,7 @@ const switchPerf: SwitchPerfEntry[] = []
 ;(window as unknown as { __astriaxSwitchPerf?: SwitchPerfEntry[] }).__astriaxSwitchPerf = switchPerf
 
 function switchPage(to: 'a' | 'n' | 'download'): void {
+  settingsOpen.value = false
   if (page.value === to) return
   const t0 = performance.now()
   page.value = to
@@ -61,7 +60,8 @@ function switchPage(to: 'a' | 'n' | 'download'): void {
     }
   })
 }
-const shown = computed(() => list.value.filter((x) => x.type === page.value))
+const search = ref('')
+const shown = computed(() => list.value.filter(x => x.type === page.value && x.name.toLowerCase().includes(search.value.trim().toLowerCase())))
 
 const { dlg, note, ask, onDlgPick, choose, chooseOne } = useLauncherDialogs()
 const { silentCheckUpdate, askExportAfterCrash } = useStartupPrompts({ choose, note })
@@ -433,13 +433,15 @@ const winApi = () => (window as unknown as { launcher?: { windowCtl?: { minimize
     </div>
     <div class="body">
     <aside class="rail">
+      <p class="rail-heading">工作区</p>
+      <label class="rail-search"><span aria-hidden="true">⌕</span><input v-model="search" aria-label="搜索实例" placeholder="搜索实例" /></label>
       <div class="railnav">
-        <button class="railbtn" :class="{ 'is-active': page === 'a' }" title="AstrBot" @click="switchPage('a')"><span class="navglyph">A</span><span>AstrBot</span></button>
-        <button class="railbtn" :class="{ 'is-active': page === 'n' }" title="NapCat" @click="switchPage('n')"><span class="navglyph">N</span><span>NapCat</span></button>
+        <button class="railbtn" :class="{ 'is-active': !settingsOpen && page === 'a' }" title="AstrBot" @click="switchPage('a')"><span class="navglyph">A</span><span>AstrBot</span></button>
+        <button class="railbtn" :class="{ 'is-active': !settingsOpen && page === 'n' }" title="NapCat" @click="switchPage('n')"><span class="navglyph">N</span><span>NapCat</span></button>
       </div>
       <div class="railfoot">
         <!-- 备份入口按用户要求去掉（功能问题多、意义不大） -->
-        <button class="railbtn" :class="{ 'is-active': page === 'download' }" title="下载" @click="switchPage('download')">
+        <button class="railbtn" :class="{ 'is-active': !settingsOpen && page === 'download' }" title="下载" @click="switchPage('download')">
           <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
             <path d="M10 2.8v9.4m0 0 3.6-3.6M10 12.2 6.4 8.6M4 16.4h12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
           </svg>
@@ -461,7 +463,9 @@ const winApi = () => (window as unknown as { launcher?: { windowCtl?: { minimize
       </div>
     </aside>
 
-    <main class="content">
+    <main class="content" :class="{ 'settings-content': settingsOpen }">
+      <SettingsPanel v-if="settingsOpen && firstRun === false" embedded @close="settingsOpen = false" @moved="onMoved" />
+      <template v-else>
       <template v-if="page === 'a' || page === 'n'">
       <Transition name="page" mode="out-in">
       <div :key="page" class="page">
@@ -486,7 +490,8 @@ const winApi = () => (window as unknown as { launcher?: { windowCtl?: { minimize
           aria-hidden="true"
         />
         <div class="empty-copy">
-          <template v-if="tplState && !tplState[page]">
+          <template v-if="search.trim()"><p class="emptyline">未找到匹配实例</p><button class="emptygo" @click="search = ''">清除搜索</button></template>
+          <template v-else-if="tplState && !tplState[page]">
             <p class="emptyline">
               还没有 {{ page === 'a' ? 'AstrBot' : 'NapCat' }} 的运行时文件，需先安装版本才能创建实例。
             </p>
@@ -532,14 +537,8 @@ const winApi = () => (window as unknown as { launcher?: { windowCtl?: { minimize
       <Transition name="page" mode="out-in">
       <DownloadPage v-if="page === 'download'" />
       </Transition>
+      </template>
     </main>
-    <img
-      v-if="firstRun === false && page !== 'download' && shown.length > 0 && !settingsOpen && !wizardOpen && !logView"
-      class="corner-mascot"
-      :src="cornerMascot"
-      alt=""
-      aria-hidden="true"
-    />
 
     <Teleport to="body">
     <div v-if="logView" class="logfull">
@@ -570,11 +569,7 @@ const winApi = () => (window as unknown as { launcher?: { windowCtl?: { minimize
       <button type="button" @click="bootErr = ''">知道了</button>
     </div>
 
-    <SettingsPanel
-      v-if="settingsOpen && firstRun === false"
-      @close="settingsOpen = false"
-      @moved="onMoved"
-    />
+
 
     <CreateWizard
       v-if="wizardOpen && firstRun === false"

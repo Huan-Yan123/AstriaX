@@ -24,7 +24,7 @@ describe('创建实例向导：前置条件必须先满足', () => {
     await flushPromises()
 
     // 明确告知原因（语气改萌系，但「需要先安装 Python 才能运行」这个事实不变）
-    expect(w.text()).toContain('AstrBot 需要先安装 Python 才能运行呢')
+    expect(w.text()).toContain('AstrBot 需要可用的 Python 3.12 或更高版本')
     // 创建按钮不可点
     const main = w.find('.main')
     expect((main.element as HTMLButtonElement).disabled).toBe(true)

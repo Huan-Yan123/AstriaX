@@ -43,9 +43,9 @@ describe('SettingsPanel（固定数据根只读展示）', () => {
     mount(SettingsPanel)
     await flushPromises()
 
-    // 圆点单选：两个 radio + 两个圆点
+    // Windows 风格原生单选控件，保留键盘与辅助技术支持。
     expect(document.body.querySelectorAll('input[type="radio"]').length).toBe(2)
-    expect(document.body.querySelectorAll('.radio .dot').length).toBe(2)
+    expect(document.body.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe('关闭行为')
     // 曾经那套「一句话按钮」不该再出现
     expect(bodyText()).not.toContain('点 ✕ 缩回托盘')
   })

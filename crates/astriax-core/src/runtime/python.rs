@@ -3,7 +3,7 @@ use crate::{
     storage::atomic_bytes,
     Error, Launcher, Result,
 };
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::{
     collections::HashMap,
     fs,
@@ -12,7 +12,7 @@ use std::{
 
 pub const VERSION: &str = "3.12.10";
 pub fn exe(root: &Path) -> PathBuf {
-    root.join("runtime/python/python.exe")
+    super::python_selection::exe(root)
 }
 pub fn prepare(dir: &Path) -> Result<()> {
     let file = dir.join("python312._pth");
@@ -39,10 +39,11 @@ pub fn prepare(dir: &Path) -> Result<()> {
     )?;
     Ok(())
 }
-pub fn pip_spec(root: &Path, target: &Path, args: Vec<String>) -> Result<LaunchSpec> {
-    let program = exe(root);
-    if !program.is_file() {
-        return Err(Error::Invalid("请先在下载页安装内置 Python 3.12".into()));
+pub async fn pip_spec(root: &Path, target: &Path, mut args: Vec<String>) -> Result<LaunchSpec> {
+    let python = super::python_selection::validate(root).await?;
+    let program = python.exe;
+    if python.source != "bundled" {
+        args.splice(0..0, ["-X".into(), "utf8".into(), "-u".into(), "-I".into()]);
     }
     Ok(LaunchSpec {
         program,
@@ -154,6 +155,19 @@ async fn install_inner(app: &Launcher, task: &crate::tasks::Task) -> Result<Valu
     check.args = vec!["-m".into(), "pip".into(), "--version".into()];
     run(&check, &task.token, &root.join("logs/python-install.log")).await?;
     task.check()?;
-    crate::transaction::replace(&root, vec![(dest, parent.join("python"))])?;
-    Ok(json!({"ok":true,"ready":true,"installed":true,"version":VERSION}))
+    let mut python = super::python_probe::probe(&dest.join("python.exe")).await?;
+    python.exe = parent.join("python/python.exe");
+    python.source = "bundled".into();
+    let selection = stage.path().join("python-selection.json");
+    crate::storage::atomic_json(&selection, &python)?;
+    crate::transaction::replace(
+        &root,
+        vec![
+            (dest, parent.join("python")),
+            (selection, parent.join("python-selection.json")),
+        ],
+    )?;
+    Ok(
+        serde_json::json!({"ok":true,"ready":true,"installed":true,"version":python.version,"exe":python.exe,"source":python.source}),
+    )
 }
