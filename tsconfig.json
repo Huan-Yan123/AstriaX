@@ -8,8 +8,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "baseUrl": ".",
-    "paths": { "@main/*": ["src/main/*"], "@renderer/*": ["src/renderer/src/*"] },
+    "paths": { "@/*": ["src/renderer/src/*"] },
+    "types": ["vite/client"],
     "noEmit": true
   },
-  "include": ["src", "tests", "electron.vite.config.ts"]
+  "include": ["src/renderer/src", "src/shared", "vite.config.ts", "vitest.config.ts"]
 }

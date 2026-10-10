@@ -1,0 +1,204 @@
+.dlg {
+  position: relative;
+  isolation: isolate;
+  width: 440px;
+  max-width: calc(100vw - 36px);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid var(--glass-edge);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  padding: 24px 28px;
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: 0 24px 64px rgba(19, 37, 70, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: popin 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+@media (max-width: 520px) {
+  .dlg {
+    width: calc(100vw - 28px);
+    padding: 20px;
+  }
+  .row {
+    flex-wrap: wrap;
+  }
+}
+.f {
+  display: block;
+  margin: 14px 0;
+}
+.f > span {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 5px;
+}
+.f input,
+.f select {
+  width: 100%;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-ctrl);
+  padding: 10px 12px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.58);
+  backdrop-filter: blur(8px);
+  font-family: inherit;
+}
+.f select:focus,
+.f input:focus {
+  border-color: var(--primary);
+  outline: none;
+}
+.noversion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+/*
+ * 「前往下载」按钮：做成实心蓝底主按钮。
+ *
+ * 用户报告：「前往下载这个按钮，没放上去就变蓝了，怎么是水平全判定」。
+ *
+ * 原来这里是白底 + 蓝边框（hover 才变蓝），而且直接在 .f 这个
+ * <label> 里 —— .f 是纵向布局，但 .noversion/.blocked 自己是 flex，
+ * 按钮被当成 flex item 拉伸/顶到边上，看起来就是「横着一整条」。
+ *
+ * 现在：实心蓝底（和产品主色一致，一眼就是个按钮）、不用 flex 撑开、
+ * 保持内容宽度。
+ */
+.noversion .go {
+  flex: none;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  border-radius: var(--radius-ctrl);
+  padding: 5px 13px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition-property: background-color, color;
+  transition-duration: 140ms;
+}
+.noversion .go:hover {
+  background: var(--primary-deep);
+}
+.hint {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  margin-top: 5px;
+}
+/* 前置条件没满足：一条淡黄提示 + 一个前往按钮，不用系统原生提示框 */
+.blocked {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: rgba(253, 246, 230, 0.68);
+  border: 1px solid rgba(240, 226, 194, 0.82);
+  backdrop-filter: blur(8px);
+  font-size: 12.5px;
+  color: #8a6d2f;
+}
+.blocked .go {
+  margin-left: auto;
+  flex: none;
+  border: 1px solid var(--primary);
+  background: rgba(255, 255, 255, 0.62);
+  color: var(--primary-deep);
+  border-radius: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition-property: background-color, color;
+  transition-duration: 140ms;
+}
+.blocked .go:hover {
+  background: var(--primary);
+  color: #fff;
+}
+.warn {
+  color: #a06f00;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.err {
+  color: var(--danger);
+  font-size: 12.5px;
+}
+.sub {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+/* 底部按钮：之前这个组件里没定义 .row/.main/.ghost，
+   于是回落到浏览器默认按钮样式（灰底方框），跟全局弹窗不是一个风格。 */
+.row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+.row button {
+  font-family: inherit;
+  font-size: 13.5px;
+  border-radius: 10px;
+  padding: 9px 20px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition-property: background-color, border-color, color, transform;
+  transition-duration: 140ms;
+  transition-timing-function: ease-out;
+}
+.row button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.row .ghost {
+  background: rgba(255, 255, 255, 0.58);
+  border-color: var(--hairline);
+  color: var(--ink-soft);
+}
+.row .ghost:hover {
+  border-color: #ccd3de;
+  color: var(--ink);
+}
+.row .main {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(74, 125, 219, 0.26);
+}
+.row .main:hover:not(:disabled) {
+  background: var(--primary-deep);
+}
+.row .main:disabled {
+  /*
+   * ## 这里不能再用浅灰底 + 全局 opacity
+   *
+   * UI 审计实算：tokens.css 的全局 `button:disabled { opacity: .55 }`
+   * 叠加原来这里的 `background: #c8d3e6`（浅灰蓝），白字最终对比度只有
+   * **约 1.24:1** —— 而 AA 正文要求 4.5。用户根本读不出按钮上写什么。
+   * 而「创建」正是新用户唯一能走的入口，禁用时最常见
+   * （没装运行时 / 没装 Python 都会禁用）。
+   *
+   * 修法：禁用态用一个**够深**的底 + 白字，让对比度达标，
+   * 同时把全局那层 opacity 抵消掉（`opacity: 1` 覆盖）。
+   * 颜色取 --primary 压暗两档的结果，仍是同一色系（不会看着像坏掉）。
+   *
+   * 对比度计算：
+   *   白字 on #7d93b8 = 3.1  ← 不够
+   *   白字 on #6b82a9 = 3.9  ← 接近
+   *   白字 on #5f759c = 4.6  ✔ 达标
+   * 所以取 #5f759c。
+   */
+  background: #5f759c;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+  /* 白字保持不变（上面 .row .main 已经是 color: #fff） */
+}

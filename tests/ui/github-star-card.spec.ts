@@ -103,31 +103,22 @@ describe('★ 资源页左侧：项目主页求 Star', () => {
 
     expect(opened, '应当调用 app.openExternal 打开仓库').toEqual([GITHUB_URL])
     /*
-     * preventDefault 是关键：Electron 渲染进程里 <a> 的默认导航
+     * preventDefault 是关键：桌面 WebView 中 <a> 的默认导航
      * 会把**启动器窗口自己**换成那个网页，用户回不来。
      */
     expect(ev.defaultPrevented, '<a> 的默认导航必须被阻止（否则启动器窗口会被替换成网页）').toBe(true)
   })
 
-  it('★ 地址必须与主进程的发布地址一致（防 owner/repo 写错）', async () => {
-    /*
-     * 渲染层不 import 主进程模块，所以这个地址在两边各写了一份
-     *（DownloadPage 的 GITHUB_REPO_URL / publish-urls.ts 的 GITHUB_WEB_URL）。
-     * 两份就可能漂移 —— 比如仓库改名只改了一处，用户点进去是 404。
-     * 这条守卫直接读主进程那份来对，保证"改一处漏一处"能被抓住。
-     */
-    const { GITHUB_WEB_URL } = await import('../../src/main/update/publish-urls')
-    const src = (await import('fs')).readFileSync(
-      (await import('path')).join(__dirname, '..', '..', 'src', 'renderer', 'src', 'DownloadPage.vue'),
-      'utf8'
-    )
-    const m = /const GITHUB_REPO_URL = '([^']+)'/.exec(src)
-    expect(m, 'DownloadPage 里应当有 GITHUB_REPO_URL 常量').toBeTruthy()
-    expect(
-      m![1],
-      `渲染层写的仓库地址（${m![1]}）与主进程的 GITHUB_WEB_URL（${GITHUB_WEB_URL}）不一致 ——\n` +
-        '两边各写了一份，改了就要一起改，否则用户点进去是 404'
-    ).toBe(GITHUB_WEB_URL)
+  it('项目主页与 Rust 更新分发仓库一致', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const distribution = fs.readFileSync(path.join(process.cwd(), 'crates/astriax-core/src/distribution.rs'), 'utf8')
+    const base = /MANIFEST_BASE: &str = "([^"]+)"/.exec(distribution)?.[1]
+    expect(base).toBe('https://raw.githubusercontent.com/Huan-Yan123/AstriaX/main/')
+    inject()
+    const w = mount(DownloadPage)
+    await flushPromises()
+    expect(w.find('.repo-link').attributes('href')).toBe(GITHUB_URL)
   })
 
   it('★ 群号与设置页用的是同一个', async () => {

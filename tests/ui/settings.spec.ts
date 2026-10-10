@@ -53,7 +53,7 @@ describe('SettingsPanel（固定数据根只读展示）', () => {
   it('★开机自启已整个移除（用户要求去掉这个功能）', async () => {
     ;(window as any).launcher = {
       config: { get: async () => ({ dataRoot: 'D:\\ACB\\data' }) },
-      // 即使旧 preload 还暴露着这些通道，界面上也不该再有入口
+      // 即使桌面 API 仍兼容这些通道，界面上也不该再有入口
       app: { autostartStatus: async () => true, setAutostart: async () => true }
     }
     mount(SettingsPanel)

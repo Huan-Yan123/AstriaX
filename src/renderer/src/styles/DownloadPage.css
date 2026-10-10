@@ -1,0 +1,229 @@
+.download-console { max-width: 1180px; margin: 0 auto; padding: 20px 28px 36px; color: var(--ink); }
+.console-head { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding-bottom:18px; border-bottom:1px solid var(--hairline); }
+.eyebrow { margin:0 0 7px; color:var(--primary); font-size:10px; font-weight:800; letter-spacing:.16em; }
+.console-head h1 { margin:0; font-size:25px; line-height:1; font-weight:750; letter-spacing:-.03em; }
+.head-note { margin:7px 0 0; color:var(--ink-soft); font-size:12px; }
+.head-actions { display:flex; align-items:center; gap:10px; }
+.head-alert { max-width:280px; color:var(--danger); font-size:11px; }
+.console-grid { display:grid; grid-template-columns:188px minmax(0,1fr); gap:34px; padding-top:22px; }
+/*
+ * 左侧栏：普通块布局，项目主页卡片**紧跟**在资源项下面。
+ *
+ * 早先用过 flex + `margin-top:auto` 把它顶到底部 —— 主人否决了
+ *（「不要在最下面，放在资源下面」）。那一栏的高度是跟着右侧内容走的，
+ * 顶到底部会让卡片与资源项之间空出一大段，反而显得是两块无关的东西。
+ */
+.resource-nav { border-right:1px solid var(--hairline); padding-right:20px; }
+.nav-title { margin:0 0 9px; color:var(--ink-soft); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.resource-item { display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:8px; min-height:48px; padding:6px 8px; margin:2px 0; border-left:2px solid transparent; }
+.resource-item.active { background:var(--primary-soft); border-left-color:var(--primary); }
+.resource-item b { display:block; font-size:12px; }
+.resource-item small { display:block; margin-top:2px; color:var(--ink-soft); font-size:10px; }
+.resource-item strong { color:var(--ink-soft); font-size:12px; }
+.resource-mark { display:grid; place-items:center; width:25px; height:25px; border-radius:5px; color:#fff; font-size:12px; font-weight:800; }
+.astrbot-mark { background:#315da8; } .napcat-mark { background:#d06a3c; }
+.nav-rule { height:1px; margin:22px 0; background:var(--hairline); }
+/*
+ * 项目主页 + 求 Star（资源项下面的一段说明文字）
+ *
+ * 三处刻意的选择：
+ *   · **没有背景**（主人的要求）—— 只有文字，读起来是这一栏的一部分
+ *   · **超链是行内的** —— 可点的只有那串地址，不是整块区域
+ *   · 星标用主色，是整段里唯一的彩色锚点（眼睛会落上去）
+ */
+.repo-note { padding:0 2px; }
+.repo-head { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.repo-head b { color:var(--ink); font-size:11.5px; font-weight:700; }
+.repo-star { width:12px; height:12px; flex:0 0 auto; fill:var(--primary); }
+.repo-note p { margin:0; color:var(--ink-soft); font-size:10.5px; line-height:1.65; }
+.repo-note em { color:var(--primary); font-style:normal; font-weight:700; }
+/* 超链：地址本身就长得像地址，所以给下划线 + 主色，一眼看出能点 */
+.repo-link { color:var(--primary); font-weight:600; text-decoration:underline; text-underline-offset:2px; word-break:break-all; cursor:pointer; }
+.repo-link:hover { color:var(--ink); }
+
+/*
+ * 问题反馈教程（在项目主页下方）
+ *
+ * 排版上的取舍：
+ *   · 用有序列表 —— 这是**有先后顺序的步骤**（先导出日志、再描述、再提交），
+ *     用无序点会让用户以为可以任选其一。
+ *   · 与 `repo-note` 共用字号/颜色（同一栏的次要内容），
+ *     但序号用主色，让"这是可操作的步骤"一眼可辨。
+ *   · `.hint` 是补充说明，比正文再淡一级，不打断主流程的阅读。
+ */
+.feedback-guide { padding:0 2px; }
+/*
+ * 使用流程（在反馈教程下方）
+ *
+ * 与上面的反馈教程共用有序列表样式（两处都是"按顺序做"），
+ * 所以 `.flow-guide ol` 直接复用 `.feedback-guide ol` 的那套规则 ——
+ * 写成一条并集选择器，避免两处各写一遍然后慢慢漂移。
+ */
+.feedback-guide ol, .flow-guide ol { margin:0; padding-left:14px; color:var(--ink-soft); font-size:10.5px; line-height:1.7; }
+.feedback-guide li, .flow-guide li { margin-bottom:4px; }
+.feedback-guide li:last-child, .flow-guide li:last-child { margin-bottom:0; }
+.feedback-guide li::marker, .flow-guide li::marker { color:var(--primary); font-weight:700; }
+.feedback-guide li b, .flow-guide li b { color:var(--ink); font-weight:650; }
+.feedback-guide em, .flow-guide em { color:var(--primary); font-style:normal; font-weight:700; }
+.feedback-guide .hint { margin:7px 0 0; color:var(--ink-soft); font-size:10px; line-height:1.6; opacity:.82; }
+.flow-guide { padding:0 2px; }
+.env-line { display:flex; justify-content:space-between; padding:7px 0; color:var(--ink-soft); font-size:11px; border-bottom:1px solid color-mix(in srgb, var(--hairline) 70%, transparent); }
+.env-line b { max-width:112px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--danger); font-weight:650; }
+.env-truncate { display:block; }
+.env-line b.ready { color:var(--ribbon-run); }
+.resource-main { min-width:0; display:flex; flex-direction:column; }
+/*
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★★ 分区顺序：**以 DOM 顺序为准**（主人 2026-10-08 发现序号错乱）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * ## 原来错在哪
+ *
+ * 这里曾用 CSS `order` 重排显示，而模板里的编号（01/02/03…）是写死的：
+ *
+ *     DOM:  运行环境  安装版本  下载资源
+ *     order:  env=2   runtime=3  source=4
+ *     rule:  「不是这三个之一」的 section 一律 order:1   ← 这一行是祸根
+ *
+ * 于是新加的「安装 pip 库」（04）没有 order 值 → **默认 0** →
+ * 被那条通配规则之外地抢到了最前面，界面变成 01、04、02、03。
+ *
+ * ## 为什么直接删掉 order 而不是补一条 .pip-section{order:5}
+ *
+ * 补一条只是把这次的问题盖住 —— 下次再加分区还会忘。
+ * 那段 `:not(...):not(...):not(...)` 的写法本身就是"新增即踩雷"：
+ * 它默认"没列出来的都排第一"，而正确默认应当是**不动**。
+ *
+ * 现在 DOM 顺序就是显示顺序（模板里也确实是按 01→02→03→04 写的），
+ * 加分区只要按位置插进模板即可，不会再有隐式重排。
+ */
+.resource-section { padding:0 0 22px; margin:0 0 22px; border-bottom:1px solid var(--hairline); }
+.section-head { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:12px; }
+.section-head > div { display:flex; align-items:baseline; gap:10px; }
+.section-index { color:var(--primary); font:700 10px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
+.section-head h2 { margin:0; font-size:16px; font-weight:750; letter-spacing:-.015em; }
+.section-meta { color:var(--ink-soft); font-size:11px; }
+.runtime-line { display:grid; grid-template-columns:34px minmax(0,1fr) auto auto; align-items:center; gap:11px; min-height:52px; padding:9px 0; }
+.runtime-icon { display:grid; place-items:center; width:32px; height:32px; border-radius:5px; background:#e7eefb; color:#315da8; font-size:11px; font-weight:800; }
+.runtime-copy b { display:block; font-size:13px; } .runtime-copy span { display:block; margin-top:3px; color:var(--ink-soft); font-size:11px; }
+.status-chip { display:inline-flex; align-items:center; min-height:22px; padding:0 8px; border-radius:4px; background:#eef1f6; color:var(--ink-soft); font-size:10px; font-weight:750; }
+.status-chip.ready { background:#e4f3ec; color:#277653; }
+.action-btn,.tool-btn,.row-action,.cancelbtn { border:1px solid var(--hairline); cursor:pointer; font:inherit; }
+.action-btn { min-height:28px; padding:0 11px; border-radius:4px; font-size:11px; font-weight:700; }
+.action-btn.primary,.row-action.primary { border-color:var(--primary); background:var(--primary); color:#fff; }
+.action-btn.danger,.row-action.danger { border-color:#d9aaa5; background:#fff; color:#a33e37; }
+.action-btn:disabled,.tool-btn:disabled,.row-action:disabled { cursor:not-allowed; opacity:.5; }
+.tool-btn { min-height:28px; padding:0 10px; border-radius:4px; background:#fff; color:var(--ink-soft); font-size:11px; font-weight:650; }
+.tool-btn:hover:not(:disabled) { border-color:var(--primary); color:var(--primary-deep); }
+.version-table,.source-table { width:100%; }
+.table-head,.version-row,.source-row { display:grid; grid-template-columns:110px 1fr minmax(100px,1.2fr) 75px 42px; align-items:center; gap:10px; }
+.table-head { min-height:25px; color:var(--ink-soft); border-bottom:1px solid var(--hairline); font-size:10px; }
+.version-row { min-height:36px; border-bottom:1px solid color-mix(in srgb,var(--hairline) 72%,transparent); font-size:11px; }
+.version-row > span:not(.product-label),.version-row > b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.product-label { display:flex; align-items:center; gap:6px; font-weight:650; }
+.product-label i { width:6px; height:6px; border-radius:50%; } .astrbot-dot { background:#315da8; } .napcat-dot { background:#d06a3c; }
+.row-action { min-height:23px; padding:0 6px; border-radius:3px; font-size:10px; font-weight:700; }
+.empty-row { padding:17px 0; color:var(--ink-soft); font-size:11px; }
+.env-actions { display:flex; gap:5px; margin-top:4px; }
+.env-action { align-self:flex-start; min-height:21px; }
+.env-stack { cursor:default; }
+
+.environment-cell { min-width:0; min-height:48px; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:8px 11px; border-right:1px solid var(--hairline); border-bottom:1px solid var(--hairline); background:rgba(255,255,255,.16); }
+.environment-cell span { color:var(--ink-soft); font-size:10px; }
+.environment-cell b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-size:11px; font-weight:650; }
+.environment-cell b small { color:var(--ink-soft); font-size:10px; font-weight:500; }
+.env-stack { display:flex; align-items:center; gap:5px; }
+.env-stack i { width:6px; height:6px; flex:0 0 auto; border-radius:50%; background:var(--danger); }
+.env-stack i.good { background:var(--ribbon-run); }
+
+.source-block h3 { display:flex; align-items:baseline; gap:9px; margin:0 0 7px; font-size:15px; line-height:1.3; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
+.source-block h3 small { color:var(--ink-soft); font-size:10px; font-weight:500; letter-spacing:0; }
+.source-row { grid-template-columns:115px minmax(0,1fr) 75px 45px 24px; min-height:35px; border-bottom:1px solid color-mix(in srgb,var(--hairline) 72%,transparent); font-size:11px; }
+.source-url { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-soft); font-size:10px; }
+.health { color:var(--danger); font-size:10px; } .health.ok { color:var(--ribbon-run); }
+.source-tools { display:flex; gap:7px; margin-top:11px; flex-wrap:wrap; }
+.import-result { display:flex; align-items:center; gap:12px; margin-top:10px; padding:9px 11px; border:1px solid var(--hairline); border-radius:6px; background:rgba(255,255,255,.5); font-size:11px; }
+.import-result b { flex:1; min-width:0; font-weight:650; }
+.import-actions { display:flex; gap:6px; flex-shrink:0; }
+.import-note { margin:8px 0 0; font-size:11px; color:var(--ink-soft); white-space:pre-line; }
+
+/*
+ * 安装 pip 库（资源页第 04 块）
+ *
+ * 与上面几个区块共用 section 的排版（.resource-section / .section-head），
+ * 这里只补表单本身。
+ */
+.pip-note { margin:0 0 10px; color:var(--ink-soft); font-size:11px; line-height:1.6; }
+.pip-note b { color:var(--ink); font-weight:650; }
+.pip-note.bad, .pip-note.ok { margin-top:10px; white-space:pre-line; }
+/* 错误用统一的红，成功用项目表示"正常"的绿（与状态点同色） */
+.pip-note.bad { color:var(--ribbon-error); }
+.pip-note.ok { color:var(--mint); }
+.pip-form { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
+.pip-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.pip-field.grow { flex:1 1 260px; }
+.pip-field > span { color:var(--ink-soft); font-size:10px; font-weight:700; letter-spacing:.04em; }
+.pip-field select.inp { min-width:190px; }
+.pip-form .action-btn { flex:none; }
+.task-strip { margin-top:14px; padding:9px 12px; border:1px solid #cbd8ed; border-left:3px solid var(--primary); background:#f7faff; }
+.strip-label { display:flex; align-items:center; gap:6px; margin-bottom:5px; color:var(--primary-deep); font-size:10px; font-weight:800; }
+.live-dot { width:6px; height:6px; border-radius:50%; background:#2d9a70; }
+.task-row { display:grid; grid-template-columns:180px minmax(120px,1fr) minmax(100px,1.6fr) 38px 52px; align-items:center; gap:10px; min-height:30px; border-top:1px solid #e3eaf4; font-size:11px; }
+.task-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:650; } .task-state { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-soft); }
+.task-progress { height:4px; overflow:hidden; background:#dfe7f2; border-radius:2px; } .task-progress i { display:block; height:100%; background:var(--primary); }
+.task-percent { color:var(--ink-soft); font-size:10px; text-align:right; } .task-result { font-size:10px; color:var(--danger); } .task-result.done { color:var(--ribbon-run); }
+.cancelbtn { min-height:23px; padding:0 6px; border-color:#d9aaa5; border-radius:3px; background:#fff; color:#a33e37; font-size:10px; font-weight:700; }
+.cancelbtn:hover:not(:disabled) { background:#fff2f1; }
+.notice { margin:10px 0 0; padding:7px 9px; background:#f3f7fc; color:var(--ink-soft); font-size:11px; }
+.addbox { display:flex; gap:7px; margin-top:8px; } .inp { min-height:28px; padding:0 8px; border:1px solid var(--hairline); border-radius:4px; background:#fff; color:var(--ink); font-size:11px; } .inp.wide { flex:1; }
+.mask { position:fixed; inset:0; z-index:200; display:grid; place-items:center; background:rgba(19,28,43,.34); }
+.dlg { width:min(560px,calc(100vw - 36px)); max-height:75vh; display:flex; flex-direction:column; padding:18px; background:#fff; border:1px solid var(--hairline); border-radius:6px; box-shadow:0 18px 50px rgba(20,30,50,.22); }
+.dlg.small { width:min(420px,calc(100vw - 36px)); } .dhead { display:flex; align-items:center; gap:8px; margin-bottom:12px; } .dhead h2,.dlg h2 { margin:0; font-size:15px; } .dhead .x { margin-left:auto; border:0; background:transparent; color:var(--ink-soft); font-size:20px; cursor:pointer; }
+.vlist { overflow:auto; } .vitem { min-height:35px; padding:5px 0; } .vright { display:flex; align-items:center; gap:7px; margin-left:auto; } .vinfo { flex:1; } .row { display:flex; justify-content:flex-end; gap:7px; margin-top:16px; }
+.resource-item { appearance:none; width:100%; border:0; background:transparent; color:inherit; text-align:left; cursor:pointer; transition-property:background-color,border-color,transform,box-shadow; transition-duration:150ms; transition-timing-function:ease-out; }
+.resource-item:not(.active) { background:transparent; }
+.resource-item:hover { background:color-mix(in srgb,var(--primary-soft) 72%,transparent); }
+.resource-item:focus-visible,.page-btn:focus-visible,.action-btn:focus-visible,.tool-btn:focus-visible,.row-action:focus-visible,.cancelbtn:focus-visible { outline:2px solid color-mix(in srgb,var(--primary) 70%,white); outline-offset:2px; }
+.resource-item.active { box-shadow:inset 3px 0 0 var(--primary),0 5px 18px rgba(40,88,168,.08); transform:translateX(2px); }
+.placeholder-row { color:color-mix(in srgb,var(--ink-soft) 58%,transparent); }
+.placeholder-row .product-label { opacity:.48; }
+.table-footer { display:flex; justify-content:space-between; align-items:center; min-height:34px; color:var(--ink-soft); font-size:10px; border-top:1px solid var(--hairline); }
+.pager { display:flex; align-items:center; gap:8px; font-variant-numeric:tabular-nums; }
+.page-btn { display:grid; place-items:center; width:24px; height:24px; padding:0; border:1px solid var(--hairline); border-radius:4px; background:#fff; color:var(--ink); cursor:pointer; font-size:16px; line-height:1; }
+.page-btn:hover:not(:disabled) { border-color:var(--primary); color:var(--primary-deep); background:var(--primary-soft); }
+.page-btn:disabled { cursor:not-allowed; opacity:.35; }
+.mask { position:fixed; inset:0; z-index:200; display:grid; place-items:center; padding:24px; background:rgba(20,30,48,.28); backdrop-filter:blur(14px) saturate(125%); -webkit-backdrop-filter:blur(14px) saturate(125%); }
+.dlg { width:min(560px,calc(100vw - 36px)); max-height:75vh; display:flex; flex-direction:column; padding:20px; background:linear-gradient(145deg,rgba(255,255,255,.82),rgba(240,247,255,.68)); border:1px solid rgba(255,255,255,.78); border-radius:16px; box-shadow:0 24px 70px rgba(16,30,55,.28),inset 0 1px 0 rgba(255,255,255,.9); backdrop-filter:blur(26px) saturate(145%); -webkit-backdrop-filter:blur(26px) saturate(145%); }
+.dlg.small { width:min(420px,calc(100vw - 36px)); }
+.dhead { display:flex; align-items:center; gap:8px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid rgba(180,195,215,.4); }
+.dhead h2,.dlg h2 { margin:0; font-size:15px; text-wrap:balance; }
+.dhead .x { margin-left:auto; display:grid; place-items:center; width:32px; height:32px; border:1px solid transparent; border-radius:8px; background:transparent; color:var(--ink-soft); font-size:20px; cursor:pointer; transition-property:background-color,color; transition-duration:150ms; }
+.dhead .x:hover { background:rgba(179,77,69,.12); color:var(--danger); }
+.vlist { overflow:auto; padding:6px 4px 4px 0; }
+.vitem {
+  display:flex;
+  align-items:center;
+  min-height:44px;
+  gap:12px;
+  padding:7px 9px;
+  margin:0;
+  background:transparent;
+  border-bottom:1px solid rgba(164,182,207,.28);
+  border-radius:7px;
+  transition-property:background-color,border-color,transform;
+  transition-duration:150ms;
+  transition-timing-function:ease-out;
+}
+.vitem:first-child { border-top:1px solid rgba(164,182,207,.28); }
+.vitem:hover {
+  background:rgba(70,116,184,.10);
+  border-color:rgba(92,139,207,.28);
+}
+.vitem .vinfo { min-width:0; display:flex; align-items:center; gap:8px; }
+.vitem .vinfo b { color:var(--ink); font-size:12.5px; font-weight:700; }
+.vitem .vright { display:flex; align-items:center; gap:9px; margin-left:auto; }
+.vitem .meta { color:var(--ink-soft); font-size:10.5px; font-variant-numeric:tabular-nums; }
+.vitem .action-btn.primary { min-width:48px; }
+.vitem .status-chip.ready { box-shadow:inset 0 0 0 1px rgba(39,118,83,.12); }
+.pop-enter-active,.pop-leave-active { transition:opacity .14s ease,transform .14s ease; } .pop-enter-from,.pop-leave-to { opacity:0; transform:translateY(-5px); }
+@media (max-width:800px) { .console-grid { grid-template-columns:1fr; gap:18px; } .resource-nav { display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; padding:0 0 12px; border-right:0; border-bottom:1px solid var(--hairline); } .nav-title,.nav-rule { display:none; } .env-line { display:none; } .task-row { grid-template-columns:1fr 90px 38px 52px; } .task-state { display:none; } .table-head,.version-row { grid-template-columns:90px 1fr 65px 42px; } .table-head span:nth-child(3),.version-row > span:nth-child(3) { display:none; } .source-row { grid-template-columns:90px minmax(0,1fr) 45px 24px; } .source-url { display:none; } }

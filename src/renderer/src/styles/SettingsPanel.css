@@ -1,0 +1,470 @@
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(24, 39, 65, 0.25);
+  backdrop-filter: blur(10px) saturate(125%);
+  -webkit-backdrop-filter: blur(10px) saturate(125%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 70;
+}
+.panel {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  width: 720px;
+  max-width: calc(100vw - 56px);
+  max-height: calc(100vh - 90px);
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  border: 1px solid var(--glass-edge);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border-radius: 20px;
+  border-color: var(--glass-edge);
+  box-shadow: 0 24px 64px rgba(19, 37, 70, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  padding: 24px 32px;
+}
+.settings-mascot {
+  position: absolute;
+  z-index: 0;
+  top: 34px;
+  right: 8px;
+  height: clamp(300px, 43vh, 380px);
+  width: auto;
+  max-width: min(270px, 42%);
+  object-fit: contain;
+  object-position: top right;
+  opacity: 0.18;
+  pointer-events: none;
+}
+.panel > header {
+  position: relative;
+  z-index: 1;
+  flex: none;
+}
+.panel > .grid {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.panel > header .x {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+}
+.panel header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.panel header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.panel header .x {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 14px;
+}
+.panel header .x:hover {
+  color: var(--ink);
+}
+.setmask-enter-active,
+.setmask-leave-active {
+  transition: opacity 0.16s ease;
+}
+.setmask-enter-from,
+.setmask-leave-to {
+  opacity: 0;
+}
+.setpop-enter-active {
+  transition: transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.15), opacity 0.18s ease;
+}
+.setpop-enter-from {
+  transform: translateY(10px) scale(0.97);
+  opacity: 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 0;
+  row-gap: 0;
+  border-top: 1px solid var(--hairline);
+}
+.card {
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  padding: 18px 0;
+}
+.card.wide {
+  grid-column: 1 / -1;
+}
+.rowhint {
+  margin: 8px 0 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+/* 单选：圆点 + 两行说明，比两个按钮清楚得多 */
+.radios {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--hairline);
+  border-radius: 0;
+  cursor: pointer;
+  transition-property: border-color, background-color;
+  transition-duration: 140ms;
+  transition-timing-function: ease-out;
+}
+.radio:hover {
+  background: color-mix(in srgb, var(--primary-soft) 55%, transparent);
+}
+.radio.on {
+  color: var(--primary-deep);
+  background: transparent;
+}
+/* 真 radio 藏起来但保留可聚焦、可用键盘操作 */
+.radio input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.radio .dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 1.5px solid #c3cad6;
+  background: #fff;
+  position: relative;
+  transition-property: border-color;
+  transition-duration: 140ms;
+}
+.radio.on .dot {
+  border-color: var(--primary);
+}
+.radio.on .dot::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--primary);
+  transform: scale(0.4);
+  opacity: 0;
+  animation: dotin 0.16s ease-out forwards;
+}
+@keyframes dotin {
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.radio input:focus-visible + .dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.rtext {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.rtext em {
+  font-style: normal;
+  font-size: 13px;
+  color: var(--ink);
+}
+.rtext small {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+/* 开关：状态一眼看出，不用读文字 */
+.switchrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.switchrow .rtext {
+  flex: 1;
+}
+.switch {
+  flex: none;
+  width: 46px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 13px;
+  background: #eef1f6;
+  position: relative;
+  cursor: pointer;
+  transition-property: background-color, border-color;
+  transition-duration: 160ms;
+  transition-timing-function: ease-out;
+}
+.switch .knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(24, 30, 42, 0.22);
+  transition-property: transform;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.1);
+}
+.switch.on {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.switch.on .knob {
+  transform: translateX(20px);
+}
+.switch:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 20%, transparent);
+}
+.pick {
+  border: 1px solid var(--hairline);
+  background: rgba(255, 255, 255, 0.58);
+  backdrop-filter: blur(8px);
+  border-radius: var(--radius-ctrl);
+  padding: 7px 14px;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+.pick.on {
+  border-color: var(--primary);
+  color: var(--primary-deep);
+  background: var(--primary-soft);
+}
+/* 主操作：蓝底白字，一眼看出是能点的 */
+.pick.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  padding: 8px 18px;
+  font-weight: 500;
+  transition-property: background-color, transform;
+  transition-duration: 140ms;
+  transition-timing-function: ease-out;
+}
+/* 日志那一行：标题在左，按钮靠右且小巧 */
+.logrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/*
+ * 官方群那一行：与上面的"问题反馈"分开一点，避免看成一整块。
+ *
+ * 用一条极浅的分隔线而不是加大间距 —— 它俩是**同类信息**（联系方式），
+ * 间距太大会显得是两个模块；而完全贴着又分不清哪个是哪个。
+ */
+.logrow.group {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+
+/*
+ * 问题反馈的 QQ 号：用等宽字体 + 稍大一点，方便用户照着输入。
+ *
+ * 为什么不用主色调高亮：它不是操作按钮（点了也没反应），
+ * 只是"一串要抄下来的数字"。视觉上像"可点的链接"会误导用户去点。
+ * margin-left:auto 把它推到右边，与「日志」行的按钮位置对齐。
+ */
+.qqnum {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  color: var(--primary-deep);
+  user-select: all; /* 一键全选，方便复制 */
+}
+@media (max-width: 720px) {
+  .panel {
+    width: calc(100vw - 32px);
+    max-width: none;
+    padding: 20px;
+  }
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------- 操作审计 ---------------- */
+/* 和上面的「日志」行拉开距离，两者是不同的东西 */
+.auditrow {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+.auditctl {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.picksel {
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.58);
+  backdrop-filter: blur(8px);
+  color: var(--ink);
+}
+/* 审计原文一行一条，等宽字体便于对齐时间戳 */
+.auditbox {
+  margin: 12px 0 0;
+  max-height: 300px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: var(--radius-ctrl);
+  background: var(--card-n);
+  border: 1px solid var(--hairline);
+  font-family: 'Cascadia Mono', 'Consolas', monospace;
+  font-size: 11.5px;
+  line-height: 1.7;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.pick.primary.sm {
+  margin-left: auto;
+  padding: 5px 12px;
+  font-size: 12px;
+}
+.pick.primary:hover:not(:disabled) {
+  background: var(--primary-deep);
+}
+.pick.primary:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.pick.primary:disabled {
+  /*
+   * ★ 禁用态不许再用 opacity 压暗（四厂商审计，与 InstanceCard 同一修法）
+   *
+   * 原来是 `opacity: 0.6`：白字压在 --primary（#2f6bd8）上，白卡背景下
+   * 有效底色 ≈ #82A6E8，文字对比度实测**2.4:1**（AA 要 4.5）——
+   * 「下载更新」正是这张设置里唯一的主按钮，禁用（正在下载中）
+   * 是最常出现的状态。
+   *
+   * 项目在 tokens.css 立过规矩：`button:disabled` 全局那几层已经把
+   * "灰"表达完了，**组件层不要再叠 opacity**（两层会相乘更糟）。
+   * 这里照 InstanceCard 的合规写法：换一个够深的底 + 抵消全局 opacity。
+   * 白字 on #5f759c 的对比度 = 4.66 ✔。
+   */
+  background: #5f759c;
+  border-color: #5f759c;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 1;
+}
+.path {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin: 6px 0 0;
+  word-break: break-all;
+}
+.hint {
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+.hint.strong {
+  color: var(--ink);
+}
+/*
+ * 搬家进行中的横幅：用主色底 + 深字，让它在一屏灰色提示里**一眼可见**。
+ * （信息本身很重要：它解释了"为什么按钮是灰的、什么时候能好"。）
+ * 对比度按项目规矩实测过：--primary-soft(#e8f0fd) 底 + --primary-deep 字
+ * 高于 AA 门槛。
+ */
+.hint.moving {
+  color: var(--primary-deep);
+  background: var(--primary-soft);
+  border-radius: var(--radius-ctrl);
+  padding: 8px 10px;
+}
+/*
+ * 下载好的安装包路径：行内等宽展示 + 一个跳转按钮。
+ * 用 --ink（而不是 --ink-soft）是因为路径是**用户要抄/要点的信息**，
+ * 不是辅助说明；--ink-soft 在白卡上只有 3.87 对比度，偏虚。
+ */
+.pathinline {
+  font-family: var(--font);
+  color: var(--ink);
+  word-break: break-all;
+}
+.linkbtn {
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  /* 链接式按钮：颜色只能用 token，且必须够对比（--primary-deep 白底 5.92） */
+  color: var(--primary-deep);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.linkbtn:hover {
+  color: var(--primary);
+}
+/*
+ * 更新说明。
+ * 用 --primary-soft 打底的浅蓝块，但**文字必须用 --primary-deep** ——
+ * --primary-soft 在白卡上对比只有 1.14（几乎看不见），
+ * 所以背景色只能是背景，不能承载文字。
+ */
+.notes {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-ctrl);
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+/* 迁移漏项的清单：必须显眼（它解释「为什么新目录里启动不了」） */
+.faillist {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.faillist b {
+  color: var(--primary-deep);
+}
+.err {
+  color: var(--danger);
+}

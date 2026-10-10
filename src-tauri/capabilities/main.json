@@ -1,0 +1,6 @@
+{
+  "identifier": "main",
+  "description": "本地 Vue 主窗口；第三方 WebUI 不授予启动器权限",
+  "windows": ["main"],
+  "permissions": ["core:event:default", "core:window:allow-start-dragging"]
+}

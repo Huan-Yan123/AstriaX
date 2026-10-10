@@ -1,0 +1,15 @@
+[workspace]
+members = ["crates/astriax-core", "src-tauri"]
+default-members = ["crates/astriax-core"]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.1"
+edition = "2021"
+license = "MIT"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+

@@ -1,8 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { rmSync } from 'fs'
 import App from '../../src/renderer/src/App.vue'
-import { testStage } from '../helpers/stage'
 
 /**
  * 实例页的空态必须能分辨两种情况。
@@ -13,14 +11,7 @@ import { testStage } from '../helpers/stage'
  *
  * 所以缺运行时的时候要直说缺什么，并给一个「前往安装」的按钮送到下载页。
  */
-let root: string
-
-beforeEach(() => {
-  root = testStage('ui-empty-')
-})
-afterEach(() => {
-  rmSync(root, { recursive: true, force: true })
-})
+const root = 'G:/isolated-ui-fixture'
 
 /** 造一个最小可用的 window.launcher：实例列表为空，运行时状态可控 */
 function mountApp(deps: { templateReady: { a: boolean; n: boolean } }) {

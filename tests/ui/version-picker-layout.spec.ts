@@ -51,7 +51,7 @@ describe('★换版本弹窗：调用方必须把 choiceList 传下去', () => {
   })
 
   it('chooseOne 设了 choiceList 且把 current 传下去', () => {
-    const src = APP()
+    const src = readFileSync(join(process.cwd(), 'src/renderer/src/composables/useLauncherDialogs.ts'), 'utf8')
     const i = src.indexOf('function chooseOne')
     expect(i, '找不到 chooseOne').toBeGreaterThan(0)
     const body = src.slice(i, i + 2000)
@@ -62,7 +62,7 @@ describe('★换版本弹窗：调用方必须把 choiceList 传下去', () => {
   })
 
   it('pickVersion 组装选项时给了 current 标记', () => {
-    const src = APP()
+    const src = readFileSync(join(process.cwd(), 'src/renderer/src/composables/useInstanceVersions.ts'), 'utf8')
     const i = src.indexOf('const options = shown.map')
     expect(i, '找不到 pickVersion 里的 options 组装').toBeGreaterThan(0)
     const body = src.slice(i, i + 700)

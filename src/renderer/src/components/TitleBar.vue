@@ -9,7 +9,7 @@ import astriaxLogo from '../assets/astriax-logo.png'
 const isMaximized = ref(false)
 
 // 窗口控制 API
-const windowApi = () => (window as any).electron?.window
+const windowApi = () => (window as any).desktop?.window
 
 // 最小化
 function minimize(): void {
@@ -55,9 +55,9 @@ onUnmounted(() => {
 <template>
   <div class="titlebar">
     <!-- 可拖拽区域 -->
-    <div class="titlebar__drag">
-      <img :src="astriaxLogo" alt="AstriaX" class="titlebar__logo" />
-      <span class="titlebar__title">AstriaX</span>
+    <div class="titlebar__drag" data-tauri-drag-region>
+      <img :src="astriaxLogo" alt="AstriaX" class="titlebar__logo" data-tauri-drag-region />
+      <span class="titlebar__title" data-tauri-drag-region>AstriaX</span>
     </div>
 
     <!-- 窗口控制按钮（禁用拖拽） -->

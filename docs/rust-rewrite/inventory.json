@@ -1,0 +1,2091 @@
+{
+  "schemaVersion": 1,
+  "analysisDate": "2026-10-10",
+  "timezone": "Asia/Hong_Kong",
+  "gitCommit": "341683d",
+  "packageVersion": "1.0.1",
+  "scope": "Static inventory, not runtime verification or complete argument/result schemas",
+  "counts": {
+    "sourceFiles": 97,
+    "sourcePhysicalLines": 33429,
+    "businessHandlerChannels": 68,
+    "uniqueRequestChannels": 69,
+    "oneWayCommands": 1,
+    "preloadEvents": 5,
+    "testFiles": 190,
+    "testCategories": {
+      "integration": 8,
+      "stress": 2,
+      "ui": 23,
+      "unit": 157
+    }
+  },
+  "requests": [
+    {
+      "channel": "app:checkUpdate",
+      "featureId": "F28",
+      "rustModule": "services/app_update",
+      "definitions": [
+        {
+          "channel": "app:checkUpdate",
+          "source": "src/main/ipc.ts",
+          "line": 2187
+        }
+      ],
+      "preload": [
+        {
+          "channel": "app:checkUpdate",
+          "source": "src/preload/api-map.ts",
+          "line": 238
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "app:downloadUpdate",
+      "featureId": "F28",
+      "rustModule": "services/app_update",
+      "definitions": [
+        {
+          "channel": "app:downloadUpdate",
+          "source": "src/main/ipc.ts",
+          "line": 2251
+        }
+      ],
+      "preload": [
+        {
+          "channel": "app:downloadUpdate",
+          "source": "src/preload/api-map.ts",
+          "line": 241
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "app:lastCrash",
+      "featureId": "F22",
+      "rustModule": "services/diagnostics",
+      "definitions": [
+        {
+          "channel": "app:lastCrash",
+          "source": "src/main/ipc.ts",
+          "line": 2182
+        }
+      ],
+      "preload": [
+        {
+          "channel": "app:lastCrash",
+          "source": "src/preload/api-map.ts",
+          "line": 236
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "app:openExternal",
+      "featureId": "F10",
+      "rustModule": "platform-win/qq/shell",
+      "definitions": [
+        {
+          "channel": "app:openExternal",
+          "source": "src/main/ipc.ts",
+          "line": 2429
+        }
+      ],
+      "preload": [
+        {
+          "channel": "app:openExternal",
+          "source": "src/preload/api-map.ts",
+          "line": 227
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "app:ping",
+      "featureId": "F03",
+      "rustModule": "storage/config",
+      "definitions": [
+        {
+          "channel": "app:ping",
+          "source": "src/main/ipc.ts",
+          "line": 1180
+        }
+      ],
+      "preload": [
+        {
+          "channel": "app:ping",
+          "source": "src/preload/api-map.ts",
+          "line": 5
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "app:skipVersion",
+      "featureId": "F28",
+      "rustModule": "services/app_update",
+      "definitions": [
+        {
+          "channel": "app:skipVersion",
+          "source": "src/main/ipc.ts",
+          "line": 2364
+        }
+      ],
+      "preload": [
+        {
+          "channel": "app:skipVersion",
+          "source": "src/preload/api-map.ts",
+          "line": 243
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "app:version",
+      "featureId": "F28",
+      "rustModule": "services/app_update",
+      "definitions": [
+        {
+          "channel": "app:version",
+          "source": "src/main/ipc.ts",
+          "line": 2177
+        }
+      ],
+      "preload": [
+        {
+          "channel": "app:version",
+          "source": "src/preload/api-map.ts",
+          "line": 230
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "audit:days",
+      "featureId": "F23",
+      "rustModule": "services/diagnostics/audit",
+      "definitions": [
+        {
+          "channel": "audit:days",
+          "source": "src/main/ipc.ts",
+          "line": 2998
+        }
+      ],
+      "preload": [
+        {
+          "channel": "audit:days",
+          "source": "src/preload/api-map.ts",
+          "line": 119
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "audit:read",
+      "featureId": "F23",
+      "rustModule": "services/diagnostics/audit",
+      "definitions": [
+        {
+          "channel": "audit:read",
+          "source": "src/main/ipc.ts",
+          "line": 2989
+        }
+      ],
+      "preload": [
+        {
+          "channel": "audit:read",
+          "source": "src/preload/api-map.ts",
+          "line": 121
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "backup:del",
+      "featureId": "F24",
+      "rustModule": "services/backup",
+      "definitions": [
+        {
+          "channel": "backup:del",
+          "source": "src/main/ipc.ts",
+          "line": 3010
+        }
+      ],
+      "preload": [
+        {
+          "channel": "backup:del",
+          "source": "src/preload/api-map.ts",
+          "line": 208
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "backup:list",
+      "featureId": "F24",
+      "rustModule": "services/backup",
+      "definitions": [
+        {
+          "channel": "backup:list",
+          "source": "src/main/ipc.ts",
+          "line": 2934
+        }
+      ],
+      "preload": [
+        {
+          "channel": "backup:list",
+          "source": "src/preload/api-map.ts",
+          "line": 207
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "backup:make",
+      "featureId": "F24",
+      "rustModule": "services/backup",
+      "definitions": [
+        {
+          "channel": "backup:make",
+          "source": "src/main/ipc.ts",
+          "line": 2874
+        }
+      ],
+      "preload": [
+        {
+          "channel": "backup:make",
+          "source": "src/preload/api-map.ts",
+          "line": 23
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "backup:openFolder",
+      "featureId": "F24",
+      "rustModule": "services/backup",
+      "definitions": [
+        {
+          "channel": "backup:openFolder",
+          "source": "src/main/ipc.ts",
+          "line": 2968
+        }
+      ],
+      "preload": [
+        {
+          "channel": "backup:openFolder",
+          "source": "src/preload/api-map.ts",
+          "line": 211
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "backup:restore",
+      "featureId": "F24",
+      "rustModule": "services/backup",
+      "definitions": [
+        {
+          "channel": "backup:restore",
+          "source": "src/main/ipc.ts",
+          "line": 3015
+        }
+      ],
+      "preload": [
+        {
+          "channel": "backup:restore",
+          "source": "src/preload/api-map.ts",
+          "line": 209
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "backup:updateList",
+      "featureId": "F25",
+      "rustModule": "services/backup/update",
+      "definitions": [
+        {
+          "channel": "backup:updateList",
+          "source": "src/main/ipc.ts",
+          "line": 2951
+        }
+      ],
+      "preload": [
+        {
+          "channel": "backup:updateList",
+          "source": "src/preload/api-map.ts",
+          "line": 219
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "config:get",
+      "featureId": "F03",
+      "rustModule": "storage/config",
+      "definitions": [
+        {
+          "channel": "config:get",
+          "source": "src/main/ipc.ts",
+          "line": 1217
+        }
+      ],
+      "preload": [
+        {
+          "channel": "config:get",
+          "source": "src/preload/api-map.ts",
+          "line": 53
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "config:moveDataRoot",
+      "featureId": "F04",
+      "rustModule": "services/relocation",
+      "definitions": [
+        {
+          "channel": "config:moveDataRoot",
+          "source": "src/main/ipc.ts",
+          "line": 1272
+        }
+      ],
+      "preload": [
+        {
+          "channel": "config:moveDataRoot",
+          "source": "src/preload/api-map.ts",
+          "line": 55
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "config:moving",
+      "featureId": "F04",
+      "rustModule": "services/relocation",
+      "definitions": [
+        {
+          "channel": "config:moving",
+          "source": "src/main/ipc.ts",
+          "line": 1263
+        }
+      ],
+      "preload": [
+        {
+          "channel": "config:moving",
+          "source": "src/preload/api-map.ts",
+          "line": 62
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "config:set",
+      "featureId": "F03",
+      "rustModule": "storage/config",
+      "definitions": [
+        {
+          "channel": "config:set",
+          "source": "src/main/ipc.ts",
+          "line": 1218
+        }
+      ],
+      "preload": [
+        {
+          "channel": "config:set",
+          "source": "src/preload/api-map.ts",
+          "line": 54
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "dialog:pickDataDir",
+      "featureId": "F03",
+      "rustModule": "storage/config",
+      "definitions": [
+        {
+          "channel": "dialog:pickDataDir",
+          "source": "src/main/ipc.ts",
+          "line": 1196
+        }
+      ],
+      "preload": [
+        {
+          "channel": "dialog:pickDataDir",
+          "source": "src/preload/api-map.ts",
+          "line": 65
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "download:sessions",
+      "featureId": "F19",
+      "rustModule": "services/tasks",
+      "definitions": [
+        {
+          "channel": "download:sessions",
+          "source": "src/main/ipc.ts",
+          "line": 2109
+        }
+      ],
+      "preload": [
+        {
+          "channel": "download:sessions",
+          "source": "src/preload/api-map.ts",
+          "line": 108
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:create",
+      "featureId": "F05",
+      "rustModule": "services/instance",
+      "definitions": [
+        {
+          "channel": "instance:create",
+          "source": "src/main/ipc.ts",
+          "line": 1455
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:create",
+          "source": "src/preload/api-map.ts",
+          "line": 16
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:creds",
+      "featureId": "F20",
+      "rustModule": "services/credentials",
+      "definitions": [
+        {
+          "channel": "instance:creds",
+          "source": "src/main/ipc.ts",
+          "line": 2450
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:creds",
+          "source": "src/preload/api-map.ts",
+          "line": 20
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:list",
+      "featureId": "F05",
+      "rustModule": "services/instance",
+      "definitions": [
+        {
+          "channel": "instance:list",
+          "source": "src/main/ipc.ts",
+          "line": 1407
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:list",
+          "source": "src/preload/api-map.ts",
+          "line": 15
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:log",
+      "featureId": "F21",
+      "rustModule": "services/diagnostics/logs",
+      "definitions": [
+        {
+          "channel": "instance:log",
+          "source": "src/main/ipc.ts",
+          "line": 2832
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:log",
+          "source": "src/preload/api-map.ts",
+          "line": 22
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:remove",
+      "featureId": "F07",
+      "rustModule": "services/process",
+      "definitions": [
+        {
+          "channel": "instance:remove",
+          "source": "src/main/ipc.ts",
+          "line": 1973
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:remove",
+          "source": "src/preload/api-map.ts",
+          "line": 19
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:resetCreds",
+      "featureId": "F20",
+      "rustModule": "services/credentials",
+      "definitions": [
+        {
+          "channel": "instance:resetCreds",
+          "source": "src/main/ipc.ts",
+          "line": 2789
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:resetCreds",
+          "source": "src/preload/api-map.ts",
+          "line": 21
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:setRuntime",
+      "featureId": "F08",
+      "rustModule": "services/instance",
+      "definitions": [
+        {
+          "channel": "instance:setRuntime",
+          "source": "src/main/ipc.ts",
+          "line": 2468
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:setRuntime",
+          "source": "src/preload/api-map.ts",
+          "line": 29
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:start",
+      "featureId": "F06",
+      "rustModule": "services/instance/process",
+      "definitions": [
+        {
+          "channel": "instance:start",
+          "source": "src/main/ipc.ts",
+          "line": 1521
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:start",
+          "source": "src/preload/api-map.ts",
+          "line": 17
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:stop",
+      "featureId": "F07",
+      "rustModule": "services/process",
+      "definitions": [
+        {
+          "channel": "instance:stop",
+          "source": "src/main/ipc.ts",
+          "line": 1907
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:stop",
+          "source": "src/preload/api-map.ts",
+          "line": 18
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "instance:update",
+      "featureId": "F09",
+      "rustModule": "services/instance/update",
+      "definitions": [
+        {
+          "channel": "instance:update",
+          "source": "src/main/ipc.ts",
+          "line": 2594
+        }
+      ],
+      "preload": [
+        {
+          "channel": "instance:update",
+          "source": "src/preload/api-map.ts",
+          "line": 50
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "logs:export",
+      "featureId": "F22",
+      "rustModule": "services/diagnostics",
+      "definitions": [
+        {
+          "channel": "logs:export",
+          "source": "src/main/ipc.ts",
+          "line": 2054
+        }
+      ],
+      "preload": [
+        {
+          "channel": "logs:export",
+          "source": "src/preload/api-map.ts",
+          "line": 89
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "logs:exportBusy",
+      "featureId": "F22",
+      "rustModule": "services/diagnostics",
+      "definitions": [
+        {
+          "channel": "logs:exportBusy",
+          "source": "src/main/ipc.ts",
+          "line": 2102
+        }
+      ],
+      "preload": [
+        {
+          "channel": "logs:exportBusy",
+          "source": "src/preload/api-map.ts",
+          "line": 98
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "mirrors:add",
+      "featureId": "F13",
+      "rustModule": "services/sources/github",
+      "definitions": [
+        {
+          "channel": "mirrors:add",
+          "source": "src/main/ipc.ts",
+          "line": 3089
+        }
+      ],
+      "preload": [
+        {
+          "channel": "mirrors:add",
+          "source": "src/preload/api-map.ts",
+          "line": 180
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "mirrors:pref",
+      "featureId": "F13",
+      "rustModule": "services/sources/github",
+      "definitions": [
+        {
+          "channel": "mirrors:pref",
+          "source": "src/main/ipc.ts",
+          "line": 3098
+        }
+      ],
+      "preload": [
+        {
+          "channel": "mirrors:pref",
+          "source": "src/preload/api-map.ts",
+          "line": 182
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "mirrors:remove",
+      "featureId": "F13",
+      "rustModule": "services/sources/github",
+      "definitions": [
+        {
+          "channel": "mirrors:remove",
+          "source": "src/main/ipc.ts",
+          "line": 3094
+        }
+      ],
+      "preload": [
+        {
+          "channel": "mirrors:remove",
+          "source": "src/preload/api-map.ts",
+          "line": 181
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "mirrors:state",
+      "featureId": "F13",
+      "rustModule": "services/sources/github",
+      "definitions": [
+        {
+          "channel": "mirrors:state",
+          "source": "src/main/ipc.ts",
+          "line": 3085
+        }
+      ],
+      "preload": [
+        {
+          "channel": "mirrors:state",
+          "source": "src/preload/api-map.ts",
+          "line": 179
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "mirrors:test",
+      "featureId": "F13",
+      "rustModule": "services/sources/github",
+      "definitions": [
+        {
+          "channel": "mirrors:test",
+          "source": "src/main/ipc.ts",
+          "line": 3081
+        }
+      ],
+      "preload": [
+        {
+          "channel": "mirrors:test",
+          "source": "src/preload/api-map.ts",
+          "line": 178
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "paths:defaults",
+      "featureId": "F03",
+      "rustModule": "storage/config",
+      "definitions": [
+        {
+          "channel": "paths:defaults",
+          "source": "src/main/ipc.ts",
+          "line": 1204
+        }
+      ],
+      "preload": [
+        {
+          "channel": "paths:defaults",
+          "source": "src/preload/api-map.ts",
+          "line": 12
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "pysrc:add",
+      "featureId": "F14",
+      "rustModule": "services/sources/python",
+      "definitions": [
+        {
+          "channel": "pysrc:add",
+          "source": "src/main/ipc.ts",
+          "line": 3137
+        }
+      ],
+      "preload": [
+        {
+          "channel": "pysrc:add",
+          "source": "src/preload/api-map.ts",
+          "line": 202
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "pysrc:pref",
+      "featureId": "F14",
+      "rustModule": "services/sources/python",
+      "definitions": [
+        {
+          "channel": "pysrc:pref",
+          "source": "src/main/ipc.ts",
+          "line": 3128
+        }
+      ],
+      "preload": [
+        {
+          "channel": "pysrc:pref",
+          "source": "src/preload/api-map.ts",
+          "line": 200
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "pysrc:remove",
+      "featureId": "F14",
+      "rustModule": "services/sources/python",
+      "definitions": [
+        {
+          "channel": "pysrc:remove",
+          "source": "src/main/ipc.ts",
+          "line": 3151
+        }
+      ],
+      "preload": [
+        {
+          "channel": "pysrc:remove",
+          "source": "src/preload/api-map.ts",
+          "line": 204
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "pysrc:state",
+      "featureId": "F14",
+      "rustModule": "services/sources/python",
+      "definitions": [
+        {
+          "channel": "pysrc:state",
+          "source": "src/main/ipc.ts",
+          "line": 3112
+        }
+      ],
+      "preload": [
+        {
+          "channel": "pysrc:state",
+          "source": "src/preload/api-map.ts",
+          "line": 196
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "pysrc:test",
+      "featureId": "F14",
+      "rustModule": "services/sources/python",
+      "definitions": [
+        {
+          "channel": "pysrc:test",
+          "source": "src/main/ipc.ts",
+          "line": 3122
+        }
+      ],
+      "preload": [
+        {
+          "channel": "pysrc:test",
+          "source": "src/preload/api-map.ts",
+          "line": 198
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "python:install",
+      "featureId": "F11",
+      "rustModule": "services/python",
+      "definitions": [
+        {
+          "channel": "python:install",
+          "source": "src/main/ipc.ts",
+          "line": 4851
+        }
+      ],
+      "preload": [
+        {
+          "channel": "python:install",
+          "source": "src/preload/api-map.ts",
+          "line": 169
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "python:status",
+      "featureId": "F11",
+      "rustModule": "services/python",
+      "definitions": [
+        {
+          "channel": "python:status",
+          "source": "src/main/ipc.ts",
+          "line": 4842
+        }
+      ],
+      "preload": [
+        {
+          "channel": "python:status",
+          "source": "src/preload/api-map.ts",
+          "line": 168
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "qq:status",
+      "featureId": "F10",
+      "rustModule": "platform-win/qq/shell",
+      "definitions": [
+        {
+          "channel": "qq:status",
+          "source": "src/main/ipc.ts",
+          "line": 2417
+        }
+      ],
+      "preload": [
+        {
+          "channel": "qq:status",
+          "source": "src/preload/api-map.ts",
+          "line": 225
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "runtime:install",
+      "featureId": "F15",
+      "rustModule": "services/runtime/install",
+      "definitions": [
+        {
+          "channel": "runtime:install",
+          "source": "src/main/ipc.ts",
+          "line": 3236
+        }
+      ],
+      "preload": [
+        {
+          "channel": "runtime:install",
+          "source": "src/preload/api-map.ts",
+          "line": 133
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "runtime:installPip",
+      "featureId": "F18",
+      "rustModule": "services/runtime/pip",
+      "definitions": [
+        {
+          "channel": "runtime:installPip",
+          "source": "src/main/ipc.ts",
+          "line": 4037
+        }
+      ],
+      "preload": [
+        {
+          "channel": "runtime:installPip",
+          "source": "src/preload/api-map.ts",
+          "line": 165
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "runtimes:cancel",
+      "featureId": "F19",
+      "rustModule": "services/tasks",
+      "definitions": [
+        {
+          "channel": "runtimes:cancel",
+          "source": "src/main/ipc.ts",
+          "line": 2127
+        }
+      ],
+      "preload": [
+        {
+          "channel": "runtimes:cancel",
+          "source": "src/preload/api-map.ts",
+          "line": 153
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "runtimes:importFile",
+      "featureId": "F17",
+      "rustModule": "services/runtime/import",
+      "definitions": [
+        {
+          "channel": "runtimes:importFile",
+          "source": "src/main/ipc.ts",
+          "line": 4411
+        }
+      ],
+      "preload": [
+        {
+          "channel": "runtimes:importFile",
+          "source": "src/preload/api-map.ts",
+          "line": 143
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "runtimes:list",
+      "featureId": "F16",
+      "rustModule": "services/runtime",
+      "definitions": [
+        {
+          "channel": "runtimes:list",
+          "source": "src/main/ipc.ts",
+          "line": 4007
+        }
+      ],
+      "preload": [
+        {
+          "channel": "runtimes:list",
+          "source": "src/preload/api-map.ts",
+          "line": 136
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "runtimes:pickFile",
+      "featureId": "F17",
+      "rustModule": "services/runtime/import",
+      "definitions": [
+        {
+          "channel": "runtimes:pickFile",
+          "source": "src/main/ipc.ts",
+          "line": 4393
+        }
+      ],
+      "preload": [
+        {
+          "channel": "runtimes:pickFile",
+          "source": "src/preload/api-map.ts",
+          "line": 139
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "runtimes:probeFile",
+      "featureId": "F17",
+      "rustModule": "services/runtime/import",
+      "definitions": [
+        {
+          "channel": "runtimes:probeFile",
+          "source": "src/main/ipc.ts",
+          "line": 4396
+        }
+      ],
+      "preload": [
+        {
+          "channel": "runtimes:probeFile",
+          "source": "src/preload/api-map.ts",
+          "line": 141
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "runtimes:remove",
+      "featureId": "F16",
+      "rustModule": "services/runtime",
+      "definitions": [
+        {
+          "channel": "runtimes:remove",
+          "source": "src/main/ipc.ts",
+          "line": 4144
+        }
+      ],
+      "preload": [
+        {
+          "channel": "runtimes:remove",
+          "source": "src/preload/api-map.ts",
+          "line": 137
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "shell:showItem",
+      "featureId": "F29",
+      "rustModule": "platform-win/shell",
+      "definitions": [
+        {
+          "channel": "shell:showItem",
+          "source": "src/main/ipc.ts",
+          "line": 2167
+        }
+      ],
+      "preload": [
+        {
+          "channel": "shell:showItem",
+          "source": "src/preload/api-map.ts",
+          "line": 114
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "stats:overview",
+      "featureId": "F26",
+      "rustModule": "platform-win/system",
+      "definitions": [
+        {
+          "channel": "stats:overview",
+          "source": "src/main/ipc.ts",
+          "line": 2038
+        }
+      ],
+      "preload": [
+        {
+          "channel": "stats:overview",
+          "source": "src/preload/api-map.ts",
+          "line": 68
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "templates:download",
+      "featureId": "F15",
+      "rustModule": "services/runtime/install",
+      "definitions": [
+        {
+          "channel": "templates:download",
+          "source": "src/main/ipc.ts",
+          "line": 3164
+        }
+      ],
+      "preload": [
+        {
+          "channel": "templates:download",
+          "source": "src/preload/api-map.ts",
+          "line": 125
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "templates:status",
+      "featureId": "F15",
+      "rustModule": "services/runtime/install",
+      "definitions": [
+        {
+          "channel": "templates:status",
+          "source": "src/main/ipc.ts",
+          "line": 2460
+        }
+      ],
+      "preload": [
+        {
+          "channel": "templates:status",
+          "source": "src/preload/api-map.ts",
+          "line": 124
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "versions:list",
+      "featureId": "F12",
+      "rustModule": "services/sources/catalog",
+      "definitions": [
+        {
+          "channel": "versions:list",
+          "source": "src/main/ipc.ts",
+          "line": 3195
+        }
+      ],
+      "preload": [
+        {
+          "channel": "versions:list",
+          "source": "src/preload/api-map.ts",
+          "line": 128
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "versions:prewarm",
+      "featureId": "F12",
+      "rustModule": "services/sources/catalog",
+      "definitions": [
+        {
+          "channel": "versions:prewarm",
+          "source": "src/main/ipc.ts",
+          "line": 3213
+        }
+      ],
+      "preload": [
+        {
+          "channel": "versions:prewarm",
+          "source": "src/preload/api-map.ts",
+          "line": 130
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "webui:close",
+      "featureId": "F27",
+      "rustModule": "desktop/webui",
+      "definitions": [
+        {
+          "channel": "webui:close",
+          "source": "src/main/ipc.ts",
+          "line": 2399
+        }
+      ],
+      "preload": [
+        {
+          "channel": "webui:close",
+          "source": "src/preload/api-map.ts",
+          "line": 72
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "webui:list",
+      "featureId": "F27",
+      "rustModule": "desktop/webui",
+      "definitions": [
+        {
+          "channel": "webui:list",
+          "source": "src/main/ipc.ts",
+          "line": 2403
+        }
+      ],
+      "preload": [
+        {
+          "channel": "webui:list",
+          "source": "src/preload/api-map.ts",
+          "line": 73
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "webui:open",
+      "featureId": "F27",
+      "rustModule": "desktop/webui",
+      "definitions": [
+        {
+          "channel": "webui:open",
+          "source": "src/main/ipc.ts",
+          "line": 2368
+        }
+      ],
+      "preload": [
+        {
+          "channel": "webui:open",
+          "source": "src/preload/api-map.ts",
+          "line": 71
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "webui:visible",
+      "featureId": "F27",
+      "rustModule": "desktop/webui",
+      "definitions": [
+        {
+          "channel": "webui:visible",
+          "source": "src/main/ipc.ts",
+          "line": 2411
+        }
+      ],
+      "preload": [
+        {
+          "channel": "webui:visible",
+          "source": "src/preload/api-map.ts",
+          "line": 80
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "window:close",
+      "featureId": "F01",
+      "rustModule": "desktop/window",
+      "definitions": [
+        {
+          "channel": "window:close",
+          "source": "src/main/ipc.ts",
+          "line": 1192
+        },
+        {
+          "channel": "window:close",
+          "source": "src/main/index.ts",
+          "line": 536
+        },
+        {
+          "channel": "window:close",
+          "source": "src/main/index.ts",
+          "line": 879
+        }
+      ],
+      "preload": [
+        {
+          "channel": "window:close",
+          "source": "src/preload/api-map.ts",
+          "line": 9
+        },
+        {
+          "channel": "window:close",
+          "source": "src/preload/index.ts",
+          "line": 12
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "window:isMaximized",
+      "featureId": "F01",
+      "rustModule": "desktop/window",
+      "definitions": [
+        {
+          "channel": "window:isMaximized",
+          "source": "src/main/index.ts",
+          "line": 537
+        },
+        {
+          "channel": "window:isMaximized",
+          "source": "src/main/index.ts",
+          "line": 880
+        }
+      ],
+      "preload": [
+        {
+          "channel": "window:isMaximized",
+          "source": "src/preload/index.ts",
+          "line": 13
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "window:minimize",
+      "featureId": "F01",
+      "rustModule": "desktop/window",
+      "definitions": [
+        {
+          "channel": "window:minimize",
+          "source": "src/main/ipc.ts",
+          "line": 1181
+        },
+        {
+          "channel": "window:minimize",
+          "source": "src/main/index.ts",
+          "line": 528
+        },
+        {
+          "channel": "window:minimize",
+          "source": "src/main/index.ts",
+          "line": 871
+        }
+      ],
+      "preload": [
+        {
+          "channel": "window:minimize",
+          "source": "src/preload/api-map.ts",
+          "line": 7
+        },
+        {
+          "channel": "window:minimize",
+          "source": "src/preload/index.ts",
+          "line": 10
+        }
+      ],
+      "status": "planned"
+    },
+    {
+      "channel": "window:toggleMaximize",
+      "featureId": "F01",
+      "rustModule": "desktop/window",
+      "definitions": [
+        {
+          "channel": "window:toggleMaximize",
+          "source": "src/main/ipc.ts",
+          "line": 1185
+        },
+        {
+          "channel": "window:toggleMaximize",
+          "source": "src/main/index.ts",
+          "line": 529
+        },
+        {
+          "channel": "window:toggleMaximize",
+          "source": "src/main/index.ts",
+          "line": 872
+        }
+      ],
+      "preload": [
+        {
+          "channel": "window:toggleMaximize",
+          "source": "src/preload/api-map.ts",
+          "line": 8
+        },
+        {
+          "channel": "window:toggleMaximize",
+          "source": "src/preload/index.ts",
+          "line": 11
+        }
+      ],
+      "status": "planned"
+    }
+  ],
+  "oneWayCommands": [
+    {
+      "channel": "close:answer",
+      "source": "src/preload/api-map.ts",
+      "line": 257,
+      "featureId": "F02",
+      "rustModule": "desktop/lifecycle",
+      "status": "planned"
+    }
+  ],
+  "events": [
+    {
+      "channel": "webui:closed",
+      "source": "src/preload/api-map.ts",
+      "line": 84,
+      "featureId": "F27",
+      "status": "planned"
+    },
+    {
+      "channel": "download:progress",
+      "source": "src/preload/api-map.ts",
+      "line": 174,
+      "featureId": "F19",
+      "status": "planned"
+    },
+    {
+      "channel": "update:progress",
+      "source": "src/preload/api-map.ts",
+      "line": 247,
+      "featureId": "F28",
+      "status": "planned"
+    },
+    {
+      "channel": "close:ask",
+      "source": "src/preload/api-map.ts",
+      "line": 254,
+      "featureId": "F02",
+      "status": "planned"
+    },
+    {
+      "channel": "window:maximize-change",
+      "source": "src/preload/index.ts",
+      "line": 16,
+      "featureId": "F01",
+      "status": "planned"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "src/main/constants.ts",
+      "lines": 22
+    },
+    {
+      "path": "src/main/creds/creds.ts",
+      "lines": 630
+    },
+    {
+      "path": "src/main/elevate.ts",
+      "lines": 76
+    },
+    {
+      "path": "src/main/error/error-handler.ts",
+      "lines": 86
+    },
+    {
+      "path": "src/main/feedback.ts",
+      "lines": 55
+    },
+    {
+      "path": "src/main/hardware-override.ts",
+      "lines": 114
+    },
+    {
+      "path": "src/main/index.refactored.ts",
+      "lines": 161
+    },
+    {
+      "path": "src/main/index.ts",
+      "lines": 1106
+    },
+    {
+      "path": "src/main/instances/create.ts",
+      "lines": 88
+    },
+    {
+      "path": "src/main/ipc.ts",
+      "lines": 6302
+    },
+    {
+      "path": "src/main/logs/audit.ts",
+      "lines": 166
+    },
+    {
+      "path": "src/main/logs/boot-watch.ts",
+      "lines": 321
+    },
+    {
+      "path": "src/main/logs/crash-handler.ts",
+      "lines": 78
+    },
+    {
+      "path": "src/main/logs/device-info.ts",
+      "lines": 288
+    },
+    {
+      "path": "src/main/logs/logger.ts",
+      "lines": 717
+    },
+    {
+      "path": "src/main/logs/prune.ts",
+      "lines": 138
+    },
+    {
+      "path": "src/main/logs/read-snippet.ts",
+      "lines": 219
+    },
+    {
+      "path": "src/main/logs/startup-failure.ts",
+      "lines": 44
+    },
+    {
+      "path": "src/main/ports/allocator.ts",
+      "lines": 71
+    },
+    {
+      "path": "src/main/proc/health.ts",
+      "lines": 63
+    },
+    {
+      "path": "src/main/proc/napcat-log.ts",
+      "lines": 194
+    },
+    {
+      "path": "src/main/proc/proc-identity.ts",
+      "lines": 255
+    },
+    {
+      "path": "src/main/proc/process-manager.ts",
+      "lines": 493
+    },
+    {
+      "path": "src/main/proc/startup-guard.ts",
+      "lines": 181
+    },
+    {
+      "path": "src/main/proc/stats.ts",
+      "lines": 46
+    },
+    {
+      "path": "src/main/runtime/builtin-version.ts",
+      "lines": 115
+    },
+    {
+      "path": "src/main/runtime/dashboard.ts",
+      "lines": 245
+    },
+    {
+      "path": "src/main/runtime/instance-version.ts",
+      "lines": 98
+    },
+    {
+      "path": "src/main/runtime/layout.ts",
+      "lines": 304
+    },
+    {
+      "path": "src/main/runtime/napcat-patch.ts",
+      "lines": 66
+    },
+    {
+      "path": "src/main/runtime/python-runtime.ts",
+      "lines": 394
+    },
+    {
+      "path": "src/main/runtime/qq-check.ts",
+      "lines": 299
+    },
+    {
+      "path": "src/main/shutdown/cleanup-manager.ts",
+      "lines": 69
+    },
+    {
+      "path": "src/main/startup/boot-manager.ts",
+      "lines": 115
+    },
+    {
+      "path": "src/main/store/instance-repo.ts",
+      "lines": 442
+    },
+    {
+      "path": "src/main/store/relocate.ts",
+      "lines": 360
+    },
+    {
+      "path": "src/main/store/root-pointer.ts",
+      "lines": 148
+    },
+    {
+      "path": "src/main/tray/tray.ts",
+      "lines": 243
+    },
+    {
+      "path": "src/main/update/app-update.ts",
+      "lines": 391
+    },
+    {
+      "path": "src/main/update/app-updater.ts",
+      "lines": 184
+    },
+    {
+      "path": "src/main/update/backup-list.ts",
+      "lines": 81
+    },
+    {
+      "path": "src/main/update/backup.ts",
+      "lines": 666
+    },
+    {
+      "path": "src/main/update/import-archive.ts",
+      "lines": 631
+    },
+    {
+      "path": "src/main/update/mirror-store-test.ts",
+      "lines": 149
+    },
+    {
+      "path": "src/main/update/mirror-store.ts",
+      "lines": 478
+    },
+    {
+      "path": "src/main/update/pip-progress.ts",
+      "lines": 125
+    },
+    {
+      "path": "src/main/update/progress.ts",
+      "lines": 62
+    },
+    {
+      "path": "src/main/update/publish-urls.ts",
+      "lines": 139
+    },
+    {
+      "path": "src/main/update/python-source-test.ts",
+      "lines": 227
+    },
+    {
+      "path": "src/main/update/python-source.ts",
+      "lines": 228
+    },
+    {
+      "path": "src/main/update/running-tasks.ts",
+      "lines": 133
+    },
+    {
+      "path": "src/main/update/runtime-download.ts",
+      "lines": 478
+    },
+    {
+      "path": "src/main/update/runtime-store.ts",
+      "lines": 681
+    },
+    {
+      "path": "src/main/update/template-dl.ts",
+      "lines": 89
+    },
+    {
+      "path": "src/main/update/template-source.ts",
+      "lines": 129
+    },
+    {
+      "path": "src/main/update/templates.ts",
+      "lines": 83
+    },
+    {
+      "path": "src/main/update/update-backups.ts",
+      "lines": 219
+    },
+    {
+      "path": "src/main/update/updater.ts",
+      "lines": 151
+    },
+    {
+      "path": "src/main/update/version-catalog.ts",
+      "lines": 599
+    },
+    {
+      "path": "src/main/util/async-exec.ts",
+      "lines": 268
+    },
+    {
+      "path": "src/main/util/atomic-write.ts",
+      "lines": 75
+    },
+    {
+      "path": "src/main/util/block-watchdog.ts",
+      "lines": 92
+    },
+    {
+      "path": "src/main/util/crash-logs.ts",
+      "lines": 353
+    },
+    {
+      "path": "src/main/util/json-file.ts",
+      "lines": 35
+    },
+    {
+      "path": "src/main/util/pip-run.ts",
+      "lines": 105
+    },
+    {
+      "path": "src/main/util/safe-segment.ts",
+      "lines": 152
+    },
+    {
+      "path": "src/main/util/workdir.ts",
+      "lines": 401
+    },
+    {
+      "path": "src/main/webui/webui-manager.ts",
+      "lines": 287
+    },
+    {
+      "path": "src/main/window/window-manager.ts",
+      "lines": 95
+    },
+    {
+      "path": "src/preload/api-map.ts",
+      "lines": 258
+    },
+    {
+      "path": "src/preload/index.ts",
+      "lines": 20
+    },
+    {
+      "path": "src/renderer/src/App.vue",
+      "lines": 2176
+    },
+    {
+      "path": "src/renderer/src/AppDialog.vue",
+      "lines": 731
+    },
+    {
+      "path": "src/renderer/src/BackupPage.vue",
+      "lines": 464
+    },
+    {
+      "path": "src/renderer/src/components/base/AButton.vue",
+      "lines": 147
+    },
+    {
+      "path": "src/renderer/src/components/base/AEmptyState.vue",
+      "lines": 64
+    },
+    {
+      "path": "src/renderer/src/components/base/ALoadingSkeleton.vue",
+      "lines": 83
+    },
+    {
+      "path": "src/renderer/src/components/base/AToast.vue",
+      "lines": 177
+    },
+    {
+      "path": "src/renderer/src/components/base/AVirtualList.vue",
+      "lines": 121
+    },
+    {
+      "path": "src/renderer/src/components/TitleBar.vue",
+      "lines": 194
+    },
+    {
+      "path": "src/renderer/src/composables/useInstanceActions.ts",
+      "lines": 123
+    },
+    {
+      "path": "src/renderer/src/composables/useToast.ts",
+      "lines": 47
+    },
+    {
+      "path": "src/renderer/src/composables/useWebUI.ts",
+      "lines": 71
+    },
+    {
+      "path": "src/renderer/src/CreateWizard.vue",
+      "lines": 504
+    },
+    {
+      "path": "src/renderer/src/dl-cache.ts",
+      "lines": 142
+    },
+    {
+      "path": "src/renderer/src/DownloadPage.vue",
+      "lines": 2273
+    },
+    {
+      "path": "src/renderer/src/FirstRunWizard.vue",
+      "lines": 262
+    },
+    {
+      "path": "src/renderer/src/InstanceCard.refactored.vue",
+      "lines": 358
+    },
+    {
+      "path": "src/renderer/src/InstanceCard.vue",
+      "lines": 563
+    },
+    {
+      "path": "src/renderer/src/main.ts",
+      "lines": 10
+    },
+    {
+      "path": "src/renderer/src/SettingsPanel.vue",
+      "lines": 1177
+    },
+    {
+      "path": "src/renderer/src/stores/dialog.ts",
+      "lines": 158
+    },
+    {
+      "path": "src/renderer/src/stores/instance.ts",
+      "lines": 104
+    },
+    {
+      "path": "src/renderer/src/stores/ui.ts",
+      "lines": 125
+    },
+    {
+      "path": "src/renderer/src/styles/tokens.css",
+      "lines": 361
+    },
+    {
+      "path": "src/renderer/src/util/stamp.ts",
+      "lines": 15
+    },
+    {
+      "path": "src/renderer/src/utils/instance-state-manager.ts",
+      "lines": 103
+    }
+  ],
+  "testFiles": [
+    "tests/integration/astrbot-pypi.e2e.spec.ts",
+    "tests/integration/full-chain.e2e.spec.ts",
+    "tests/integration/import-archive-e2e.spec.ts",
+    "tests/integration/import-whl-real-deps.e2e.spec.ts",
+    "tests/integration/official-source.e2e.spec.ts",
+    "tests/integration/python-runtime.e2e.spec.ts",
+    "tests/integration/real-instance-start.e2e.spec.ts",
+    "tests/integration/real-version-backfill.e2e.spec.ts",
+    "tests/stress/stress.spec.ts",
+    "tests/stress/stress2.spec.ts",
+    "tests/ui/app-dialog-dismiss.spec.ts",
+    "tests/ui/cards.spec.ts",
+    "tests/ui/create-wizard.spec.ts",
+    "tests/ui/dialog-style.spec.ts",
+    "tests/ui/dialog-text-confirm.spec.ts",
+    "tests/ui/dl-cache.spec.ts",
+    "tests/ui/download.spec.ts",
+    "tests/ui/elapsed-survives-nav.spec.ts",
+    "tests/ui/first-run-wizard.spec.ts",
+    "tests/ui/first-run.spec.ts",
+    "tests/ui/github-star-card.spec.ts",
+    "tests/ui/hover-contrast.spec.ts",
+    "tests/ui/instance-card-version.spec.ts",
+    "tests/ui/instance-empty-state.spec.ts",
+    "tests/ui/no-dead-renderer-code.spec.ts",
+    "tests/ui/progress-stall.spec.ts",
+    "tests/ui/rapid-switch.spec.ts",
+    "tests/ui/settings-update-check.spec.ts",
+    "tests/ui/settings.spec.ts",
+    "tests/ui/source-btn-lock.spec.ts",
+    "tests/ui/stamp.spec.ts",
+    "tests/ui/startup-update-check.spec.ts",
+    "tests/ui/version-picker-layout.spec.ts",
+    "tests/unit/all-installs-cancellable.spec.ts",
+    "tests/unit/allocator.spec.ts",
+    "tests/unit/app-update-same-version.spec.ts",
+    "tests/unit/app-update-sha256.spec.ts",
+    "tests/unit/app-update.spec.ts",
+    "tests/unit/app-updater.spec.ts",
+    "tests/unit/app-version-node.spec.ts",
+    "tests/unit/astrbot-creds.spec.ts",
+    "tests/unit/astrbot-launch-prereq.spec.ts",
+    "tests/unit/astrbot-pypi.spec.ts",
+    "tests/unit/audit-live-root.spec.ts",
+    "tests/unit/audit-log.spec.ts",
+    "tests/unit/audit-path-guard.spec.ts",
+    "tests/unit/audit-wired.spec.ts",
+    "tests/unit/backup-legacy-compat.spec.ts",
+    "tests/unit/backup-list.spec.ts",
+    "tests/unit/backup-page-display.spec.ts",
+    "tests/unit/backup-path-guard.spec.ts",
+    "tests/unit/backup-safety.spec.ts",
+    "tests/unit/backup-self-describing.spec.ts",
+    "tests/unit/backup.spec.ts",
+    "tests/unit/bad-source-fallback.spec.ts",
+    "tests/unit/block-watchdog.spec.ts",
+    "tests/unit/boot-watch-wiring.spec.ts",
+    "tests/unit/boot-watch.spec.ts",
+    "tests/unit/builtin-version-real.spec.ts",
+    "tests/unit/builtin-version.spec.ts",
+    "tests/unit/cancel-cleanup.spec.ts",
+    "tests/unit/cancel-latency.spec.ts",
+    "tests/unit/cancel-not-register.spec.ts",
+    "tests/unit/cancel-wiring-guard.spec.ts",
+    "tests/unit/close-policy.spec.ts",
+    "tests/unit/config-restore.spec.ts",
+    "tests/unit/config-single-truth.spec.ts",
+    "tests/unit/crash-handler.spec.ts",
+    "tests/unit/crash-logs.spec.ts",
+    "tests/unit/create-instance.spec.ts",
+    "tests/unit/creds-astrbot-password.spec.ts",
+    "tests/unit/creds-atomic-write.spec.ts",
+    "tests/unit/creds-corrupt-config.spec.ts",
+    "tests/unit/creds.spec.ts",
+    "tests/unit/css-tokens.spec.ts",
+    "tests/unit/dashboard.spec.ts",
+    "tests/unit/data-root-pointer.spec.ts",
+    "tests/unit/deps-storage-scope.spec.ts",
+    "tests/unit/detached-process-kill.spec.ts",
+    "tests/unit/dev-cmd-bypass.spec.ts",
+    "tests/unit/device-info.spec.ts",
+    "tests/unit/dl-failure-fixes.spec.ts",
+    "tests/unit/download-mirror-fallback.spec.ts",
+    "tests/unit/elevate.spec.ts",
+    "tests/unit/exec-encoding.spec.ts",
+    "tests/unit/exit-cleanup.spec.ts",
+    "tests/unit/feedback-contact.spec.ts",
+    "tests/unit/fresh-install-config.spec.ts",
+    "tests/unit/import-archive.spec.ts",
+    "tests/unit/import-astrbot-full.spec.ts",
+    "tests/unit/import-real-packages.spec.ts",
+    "tests/unit/import-version.spec.ts",
+    "tests/unit/import-whl-runnable.spec.ts",
+    "tests/unit/install-pip.spec.ts",
+    "tests/unit/instance-log-current-run.spec.ts",
+    "tests/unit/instance-log-source.spec.ts",
+    "tests/unit/instance-meta-atomic.spec.ts",
+    "tests/unit/instance-no-runtime-copy.spec.ts",
+    "tests/unit/instance-repo-corrupt-quarantine.spec.ts",
+    "tests/unit/instance-repo.spec.ts",
+    "tests/unit/instance-set-runtime.spec.ts",
+    "tests/unit/instance-status.spec.ts",
+    "tests/unit/instance-update.spec.ts",
+    "tests/unit/instance-version-persist.spec.ts",
+    "tests/unit/instance-version.spec.ts",
+    "tests/unit/ipc-app-import-guard.spec.ts",
+    "tests/unit/ipc-app-updater.spec.ts",
+    "tests/unit/ipc-fs-import-guard.spec.ts",
+    "tests/unit/ipc-handlers.spec.ts",
+    "tests/unit/json-file.spec.ts",
+    "tests/unit/launch-cwd.spec.ts",
+    "tests/unit/layout.spec.ts",
+    "tests/unit/log-read-prune.spec.ts",
+    "tests/unit/logger.spec.ts",
+    "tests/unit/mirror-atomic.spec.ts",
+    "tests/unit/mirror-store.spec.ts",
+    "tests/unit/move-guard.spec.ts",
+    "tests/unit/napcat-creds.spec.ts",
+    "tests/unit/napcat-direct-launch.spec.ts",
+    "tests/unit/napcat-log.spec.ts",
+    "tests/unit/napcat-patch.spec.ts",
+    "tests/unit/no-blocking-deps.spec.ts",
+    "tests/unit/no-c-drive-temp.spec.ts",
+    "tests/unit/no-console-window.spec.ts",
+    "tests/unit/no-undefined-identifiers.spec.ts",
+    "tests/unit/open-external.spec.ts",
+    "tests/unit/open-folder-path.spec.ts",
+    "tests/unit/packaging-assets.spec.ts",
+    "tests/unit/parse-listener-pid.spec.ts",
+    "tests/unit/pick-source-real.spec.ts",
+    "tests/unit/pick-source-strict.spec.ts",
+    "tests/unit/pick-version-source.spec.ts",
+    "tests/unit/pip-cache-fallback.spec.ts",
+    "tests/unit/pip-progress.spec.ts",
+    "tests/unit/pm-log.spec.ts",
+    "tests/unit/ports.spec.ts",
+    "tests/unit/probe-port-guard.spec.ts",
+    "tests/unit/proc-identity.spec.ts",
+    "tests/unit/proc-listener-leak.spec.ts",
+    "tests/unit/proc-zombie.spec.ts",
+    "tests/unit/process-manager.spec.ts",
+    "tests/unit/process-ownership.spec.ts",
+    "tests/unit/progress.spec.ts",
+    "tests/unit/ps-quote.spec.ts",
+    "tests/unit/python-runtime.spec.ts",
+    "tests/unit/python-source-test.spec.ts",
+    "tests/unit/python-source.spec.ts",
+    "tests/unit/qq-check-live.spec.ts",
+    "tests/unit/qq-check.spec.ts",
+    "tests/unit/qq-version-read.spec.ts",
+    "tests/unit/relocate-faildir.spec.ts",
+    "tests/unit/relocate-full.spec.ts",
+    "tests/unit/relocate.spec.ts",
+    "tests/unit/remove-stubborn-dir.spec.ts",
+    "tests/unit/repo-corrupt.spec.ts",
+    "tests/unit/running-tasks.spec.ts",
+    "tests/unit/runtime-download.spec.ts",
+    "tests/unit/runtime-path-traversal.spec.ts",
+    "tests/unit/runtime-reinstall-safe.spec.ts",
+    "tests/unit/runtime-remove-guard.spec.ts",
+    "tests/unit/runtime-store.spec.ts",
+    "tests/unit/runtime-sweep-trash.spec.ts",
+    "tests/unit/single-instance.spec.ts",
+    "tests/unit/sitecustomize.spec.ts",
+    "tests/unit/startup-failure.spec.ts",
+    "tests/unit/startup-flow.spec.ts",
+    "tests/unit/startup-guard.spec.ts",
+    "tests/unit/stats.spec.ts",
+    "tests/unit/stop-really-stops.spec.ts",
+    "tests/unit/template-dl.spec.ts",
+    "tests/unit/template-source.spec.ts",
+    "tests/unit/template-version-repo.spec.ts",
+    "tests/unit/templates.spec.ts",
+    "tests/unit/tmp-sweeper.spec.ts",
+    "tests/unit/uninstall-script.spec.ts",
+    "tests/unit/update-auto-backup.spec.ts",
+    "tests/unit/update-backup-prune.spec.ts",
+    "tests/unit/update-download-url.spec.ts",
+    "tests/unit/update-source-wiring.spec.ts",
+    "tests/unit/update.spec.ts",
+    "tests/unit/updater-tolerance.spec.ts",
+    "tests/unit/user-reported-bugs.spec.ts",
+    "tests/unit/version-any-to-any.spec.ts",
+    "tests/unit/version-cache.spec.ts",
+    "tests/unit/version-catalog.spec.ts",
+    "tests/unit/version-num.spec.ts",
+    "tests/unit/version-updown.spec.ts",
+    "tests/unit/webui-manager.spec.ts",
+    "tests/unit/webui-stacking.spec.ts",
+    "tests/unit/workdir.spec.ts"
+  ],
+  "observations": [
+    "The production main entry is src/main/index.ts; index.refactored.ts is not selected by the current build.",
+    "The renderer entry imports App.vue and InstanceCard.vue, not InstanceCard.refactored.vue.",
+    "Instance backup .tar.gz files contain a gzip-compressed private length-prefixed record stream, not standard tar.",
+    "Installer update snapshots use standard tar.gz and are a distinct backup type.",
+    "window:isMaximized is registered in the desktop host in addition to the 68 business handler channels."
+  ]
+}

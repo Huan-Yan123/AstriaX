@@ -1,36 +1,4 @@
-/*
- * 设置面板的「检查更新」。
- *
- * ## 用户报告的三件事（原话）
- *
- *   1. 「当前版本 MXBot 未知」
- *   2. 「（检查更新失败：Error invoking remote method 'app:checkUpdate':
- *       ReferenceError: app is not defined）」
- *   3. 「不是说了检查失败就显示最新版吗，为什么还要显示报错，报错不应该显示出来」
- *
- * ## 三个根因
- *
- * ① **主进程 `app` 未定义**（第 2 条的直接原因）。
- *    ipc.ts 顶层不 import electron（单测跑纯 node），文件里所有用到 app 的
- *    地方都是函数内 `await import('electron')` 懒取。但装配处写了
- *    `appVersion: () => app.getVersion()` —— 这是**对象字面量里的表达式**，
- *    在模块装配阶段求值时 `app` 不在作用域里，于是 ReferenceError。
- *    `app:version` 走同一个箭头函数，所以版本也拿不到 → 第 1 条
- *    「MXBot 未知」是同一个根因的另一个症状，不是两个独立 bug。
- *
- * ② **渲染层读错字段**。主进程返回的是 `latestVersion`，
- *    而 SettingsPanel 读 `r.version` —— 永远 undefined。
- *    就算检查成功了，也只会显示「发现新版本 undefined」。
- *
- * ③ **失败时仍把原始报错贴出来**。`updErr.value = false` 只控制了
- *    样式（不标红），但那句 `（检查更新失败：<原始异常>）` 照样渲染。
- *    用户要的是「失败就当最新版、**不要显示报错**」，
- *    而原始异常对普通用户毫无意义（那句 ReferenceError 更是纯噪音）。
- *
- * ## 注意挂载方式
- * 面板是 `<Teleport to="body">` 渲染的，断言必须读 `document.body.textContent`，
- * 看 `wrapper.text()` 永远是空的。
- */
+// 设置页更新状态回归测试，使用桌面 API 替身。
 import { describe, it, expect, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import SettingsPanel from '../../src/renderer/src/SettingsPanel.vue'
@@ -96,7 +64,7 @@ describe('设置面板 · 检查更新', () => {
     expect(t, '应该显示出新版本号').toContain('0.2.0')
   })
 
-  it('★检查失败 → 只说「已是最新版本」，不显示原始报错', async () => {
+  it('检查失败时显示可重试提示，不误报最新版或泄漏原始异常', async () => {
     install({
       checkThrows: new Error(
         "Error invoking remote method 'app:checkUpdate': ReferenceError: app is not defined"
@@ -110,9 +78,9 @@ describe('设置面板 · 检查更新', () => {
     await w.vm.$nextTick()
 
     const t = bodyText()
-    expect(t, '失败时要显示「已是最新版本」').toContain('已是最新版本')
+    expect(t).toContain('检查更新失败，请稍后重试')
+    expect(t).not.toContain('已是最新版本')
     expect(t, '不该把 ReferenceError 这种原始报错贴给用户').not.toContain('ReferenceError')
-    expect(t, '不该出现「检查更新失败」这种措辞').not.toContain('检查更新失败')
     expect(t, '不该出现远程调用报错的原文').not.toContain('Error invoking remote method')
   })
 

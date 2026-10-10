@@ -219,7 +219,7 @@ describe('InstanceCard', () => {
     // happy-dom 不解析 scoped 样式，直接查源码里 .menu 的定位方式
     const { readFileSync } = await import('fs')
     const { join } = await import('path')
-    const src = readFileSync(join(process.cwd(), 'src/renderer/src/InstanceCard.vue'), 'utf8')
+    const src = readFileSync(join(process.cwd(), 'src/renderer/src/styles/InstanceCard.css'), 'utf8')
     const menuRule = src.slice(src.indexOf('.menu {'))
     const block = menuRule.slice(0, menuRule.indexOf('}'))
     // 用 top 贴在按钮下方；不能再用 bottom: 100% 往上弹
@@ -364,8 +364,7 @@ describe('App 骨架', () => {
      *   改成了独立的 `components/TitleBar.vue` 组件。
      *
      * 变化点：
-     *   · 调用入口从 `window.launcher.windowCtl` 改成 `window.electron.window`
-     *     （preload 暴露的命名空间变了）
+     *   · 窗口操作由 Tauri 的 `window.desktop.window` 提供
      *   · 类名从 `.winctl` 改成 `.titlebar__controls`
      *
      * 所以这条测试直接挂 **TitleBar 组件**（而不是整个 App）——
@@ -373,7 +372,7 @@ describe('App 骨架', () => {
      */
     const win = (globalThis as unknown as { window: Record<string, unknown> }).window as Record<string, unknown>
     const calls: string[] = []
-    win.electron = {
+    win.desktop = {
       window: {
         minimize: async () => calls.push('min'),
         toggleMaximize: async () => calls.push('max'),

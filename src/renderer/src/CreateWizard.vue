@@ -11,55 +11,16 @@ const emit = defineEmits<{
 // 页面已按 AstrBot / NapCat 分家——向导只服务当前页，不提供类型切换
 const props = defineProps<{
   defaultType: 'a' | 'n'
-  /*
-   * 父组件正在创建中。
-   *
-   * 为什么由父组件传入、而不是向导自己管（这是个真实 bug 的修法）：
-   * 向导原来自己 `busy = ref(false)`，submit 里置 true 之后
-   * **没有任何地方复位** —— 创建失败时父组件只弹个说明、向导不关，
-   * 于是「创建」按钮永久灰掉，用户改完名字也点不动，只能关掉重开。
-   * 重名是最常见的失败原因，所以第一次用就很可能撞上。
-   * 现在改成父组件在 `finally` 里复位（App.vue 的 create 本来就有 finally），
-   * 「谁开始、谁收尾」是同一方，不会再漏掉某条路径。
-   */
+
   busy?: boolean
 }>()
 
 const name = ref('')
 const port = ref('')
 const tag = ref('')
-/*
- * 这里原来还有个 `qqAccount`（NapCat 绑定的 QQ 号，填了免扫码）。
- *
- * 去掉的原因：
- *   1. 它的「多开隔离」作用其实是多余的 —— 实例目录本来就各自独立，
- *      NapCat 的数据文件在实例自己的 data 目录下，天然不打架；
- *   2. 填错反而有副作用：会把扫码登进去的账号覆盖成填的那个，
- *      用户看到「明明扫码了却登成了别的号」；
- *   3. 免扫码登录可以直接在 NapCat 的 WebUI 里做，不需要在创建时强加一步。
- * 所以创建实例不再问 QQ 号，登录方式交给 NapCat 自己。
- */
+
 const err = ref('')
-/*
- * ## busy 必须先置 true，然后**由父组件在失败时复位**
- *
- * 这里曾经是个真 bug（UI 审计抓出来的）：
- *   submit 里 `busy.value = true` 之后**再也没有任何地方复位** ——
- *   全文件只有 3 处出现（声明、置 true、用在 `:disabled`）。
- *
- * 后果：父组件 App.vue 的 create() 在失败时只弹一个说明
- * （重名 / 端口占用 / QQ 环境不满足），**向导并不关闭**，
- * 于是「创建」按钮永久灰着 —— 用户改完名字也点不动，
- * 只能把向导关掉重开。重名是最常见的失败原因，
- * 也就是说这个 bug 在第一次使用时几乎必然被撞上。
- *
- * 修法：向导不再自己管 busy 的复位，而是**接受父组件的 busy**。
- * 父组件在 `finally` 里置 false（App.vue 的 create 本来就有 finally），
- * 于是无论成功失败都会解锁。这样"谁开始、谁收尾"是同一方，
- * 不会出现两边各管一半、漏掉一条路径的情况。
- *
- * 兼容性：保持 `busy` 这个名字给模板用，但它现在是 computed。
- */
+
 const defaultPort = ref<number | null>(null)
 const installed = ref<Array<{ type: 'a' | 'n'; tag: string; sizeMB?: number }>>([])
 /** AstrBot 必须有内置 Python 才跑得起来（没装就是创建了也起不来） */
@@ -84,48 +45,12 @@ declare const window: {
 /** 当前类型已下载的版本（新版本在前，仓库层已排好序） */
 const myVersions = computed(() => installed.value.filter((v) => v.type === props.defaultType))
 
-/** AstrBot 才依赖内置 Python；NapCat 自带 Node，不用管 */
+/** AstrBot 依赖内置 Python；NapCat 的运行方式由上游 QQ 集成适配处理。 */
 const needsPython = computed(() => props.defaultType === 'a')
 const pythonMissing = computed(() => needsPython.value && !pyReady.value)
 
 onMounted(async () => {
-  /*
-   * ══════════════════════════════════════════════════════════════════════════
-   * ★★ 这里原来是一个**吞掉所有错误的 catch**（主人 2026-09-27 实测：
-   *    「astrbot 和 napcat 都点不了创建」）
-   * ══════════════════════════════════════════════════════════════════════════
-   *
-   * 原写法：
-   *     try {
-   *       installed.value = (await window.launcher?.runtimes?.list?.()) ?? []
-   *       tag.value = myVersions.value[0]?.tag ?? ''
-   *       if (needsPython.value) pyReady.value = ...
-   *       const list = (await window.launcher?.instance?.list?.()) ?? []
-   *       defaultPort.value = ...
-   *     } catch {
-   *       // 缺省即可
-   *     }
-   *
-   * ## 为什么这是致命的
-   *
-   * `canCreate` = `myVersions.length > 0 && !pythonMissing`，而
-   * `myVersions` 来自 `installed`。**只要上面任何一句抛错**，
-   * `installed` 就保持空 → `canCreate` 恒为 false →
-   * **「创建」按钮永久灰着，而且不给任何理由**。
-   *
-   * 更糟的是：这个弹窗里**同时**有 `tag`（能正确显示 `v4.18.28`）
-   * 和 `canCreate`（false）—— 界面自相矛盾，用户完全无从判断。
-   *
-   * ## 现在：三步各管各的，且**失败要说出来**
-   *
-   * 把三件互不依赖的事分开 try：
-   *   ① 版本列表（决定能不能建）—— 失败就把原因显示在弹窗里
-   *   ② Python 状态（只影响 AstrBot）
-   *   ③ 实例列表（只影响默认端口）
-   *
-   * 这样 ②③ 失败**不会连累** ①，而 ① 失败会明确告诉用户
-   * "没读到版本列表：<原因>"，而不是给一个哑巴灰按钮。
-   */
+
   try {
     installed.value = (await window.launcher?.runtimes?.list?.()) ?? []
   } catch (e) {
@@ -296,209 +221,4 @@ function goDownload(): void {
   </div>
 </template>
 
-<style scoped>
-.dlg {
-  position: relative;
-  isolation: isolate;
-  width: 440px;
-  max-width: calc(100vw - 36px);
-  max-height: calc(100vh - 48px);
-  overflow: auto;
-  border: 1px solid var(--glass-edge);
-  border-radius: 20px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
-  padding: 24px 28px;
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
-  box-shadow: 0 24px 64px rgba(19, 37, 70, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  animation: popin 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
-}
-@media (max-width: 520px) {
-  .dlg {
-    width: calc(100vw - 28px);
-    padding: 20px;
-  }
-  .row {
-    flex-wrap: wrap;
-  }
-}
-.f {
-  display: block;
-  margin: 14px 0;
-}
-.f > span {
-  display: block;
-  font-size: 12px;
-  color: var(--ink-soft);
-  margin-bottom: 5px;
-}
-.f input,
-.f select {
-  width: 100%;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-ctrl);
-  padding: 10px 12px;
-  font-size: 14px;
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
-  font-family: inherit;
-}
-.f select:focus,
-.f input:focus {
-  border-color: var(--primary);
-  outline: none;
-}
-.noversion {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12.5px;
-  color: var(--ink-soft);
-}
-/*
- * 「前往下载」按钮：做成实心蓝底主按钮。
- *
- * 用户报告：「前往下载这个按钮，没放上去就变蓝了，怎么是水平全判定」。
- *
- * 原来这里是白底 + 蓝边框（hover 才变蓝），而且直接在 .f 这个
- * <label> 里 —— .f 是纵向布局，但 .noversion/.blocked 自己是 flex，
- * 按钮被当成 flex item 拉伸/顶到边上，看起来就是「横着一整条」。
- *
- * 现在：实心蓝底（和产品主色一致，一眼就是个按钮）、不用 flex 撑开、
- * 保持内容宽度。
- */
-.noversion .go {
-  flex: none;
-  border: none;
-  background: var(--primary);
-  color: #fff;
-  border-radius: var(--radius-ctrl);
-  padding: 5px 13px;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition-property: background-color, color;
-  transition-duration: 140ms;
-}
-.noversion .go:hover {
-  background: var(--primary-deep);
-}
-.hint {
-  display: block;
-  color: var(--ink-soft);
-  font-size: 11.5px;
-  margin-top: 5px;
-}
-/* 前置条件没满足：一条淡黄提示 + 一个前往按钮，不用系统原生提示框 */
-.blocked {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
-  padding: 10px 12px;
-  border-radius: 11px;
-  background: rgba(253, 246, 230, 0.68);
-  border: 1px solid rgba(240, 226, 194, 0.82);
-  backdrop-filter: blur(8px);
-  font-size: 12.5px;
-  color: #8a6d2f;
-}
-.blocked .go {
-  margin-left: auto;
-  flex: none;
-  border: 1px solid var(--primary);
-  background: rgba(255, 255, 255, 0.62);
-  color: var(--primary-deep);
-  border-radius: 8px;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition-property: background-color, color;
-  transition-duration: 140ms;
-}
-.blocked .go:hover {
-  background: var(--primary);
-  color: #fff;
-}
-.warn {
-  color: #a06f00;
-  font-size: 12.5px;
-  line-height: 1.55;
-}
-.err {
-  color: var(--danger);
-  font-size: 12.5px;
-}
-.sub {
-  color: var(--ink-soft);
-  font-size: 13px;
-  line-height: 1.6;
-}
-/* 底部按钮：之前这个组件里没定义 .row/.main/.ghost，
-   于是回落到浏览器默认按钮样式（灰底方框），跟全局弹窗不是一个风格。 */
-.row {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 18px;
-}
-.row button {
-  font-family: inherit;
-  font-size: 13.5px;
-  border-radius: 10px;
-  padding: 9px 20px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition-property: background-color, border-color, color, transform;
-  transition-duration: 140ms;
-  transition-timing-function: ease-out;
-}
-.row button:active:not(:disabled) {
-  transform: scale(0.97);
-}
-.row .ghost {
-  background: rgba(255, 255, 255, 0.58);
-  border-color: var(--hairline);
-  color: var(--ink-soft);
-}
-.row .ghost:hover {
-  border-color: #ccd3de;
-  color: var(--ink);
-}
-.row .main {
-  background: var(--primary);
-  color: #fff;
-  font-weight: 500;
-  box-shadow: 0 2px 8px rgba(74, 125, 219, 0.26);
-}
-.row .main:hover:not(:disabled) {
-  background: var(--primary-deep);
-}
-.row .main:disabled {
-  /*
-   * ## 这里不能再用浅灰底 + 全局 opacity
-   *
-   * UI 审计实算：tokens.css 的全局 `button:disabled { opacity: .55 }`
-   * 叠加原来这里的 `background: #c8d3e6`（浅灰蓝），白字最终对比度只有
-   * **约 1.24:1** —— 而 AA 正文要求 4.5。用户根本读不出按钮上写什么。
-   * 而「创建」正是新用户唯一能走的入口，禁用时最常见
-   * （没装运行时 / 没装 Python 都会禁用）。
-   *
-   * 修法：禁用态用一个**够深**的底 + 白字，让对比度达标，
-   * 同时把全局那层 opacity 抵消掉（`opacity: 1` 覆盖）。
-   * 颜色取 --primary 压暗两档的结果，仍是同一色系（不会看着像坏掉）。
-   *
-   * 实测对比度（scripts/_contrast-check.cjs --test 可复核）：
-   *   白字 on #7d93b8 = 3.1  ← 不够
-   *   白字 on #6b82a9 = 3.9  ← 接近
-   *   白字 on #5f759c = 4.6  ✔ 达标
-   * 所以取 #5f759c。
-   */
-  background: #5f759c;
-  box-shadow: none;
-  cursor: not-allowed;
-  opacity: 1;
-  /* 白字保持不变（上面 .row .main 已经是 color: #fff） */
-}
-</style>
+<style scoped src="./styles/CreateWizard.css"></style>

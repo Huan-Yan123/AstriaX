@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { MX_OFFICIAL_BASE } from '../../src/main/update/publish-urls'
 import { mount, flushPromises } from '@vue/test-utils'
 import DownloadPage from '../../src/renderer/src/DownloadPage.vue'
+
+// 模拟旧数据中的已停用来源，验证当前页面不会将其显示。
+const MX_OFFICIAL_BASE = 'https://retired-source.example/'
 
 interface Calls {
   installed: Array<{ type: 'a' | 'n'; tag: string }>

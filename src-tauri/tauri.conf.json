@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AstriaX",
+  "version": "1.0.1",
+  "identifier": "fun.huanyan.astriax",
+  "build": {
+    "beforeDevCommand": "pnpm dev:web",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build:web",
+    "frontendDist": "../dist/web"
+  },
+  "app": {
+    "windows": [{ "label": "main", "title": "AstriaX", "width": 1180, "height": 800, "minWidth": 900, "minHeight": 640, "decorations": false }],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost data:; connect-src ipc: http://ipc.localhost; font-src 'self' data:; object-src 'none'; frame-src 'none'",
+      "capabilities": ["main"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "windows": { "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true }, "nsis": { "languages": ["SimpChinese"], "displayLanguageSelector": false } }
+  }
+}

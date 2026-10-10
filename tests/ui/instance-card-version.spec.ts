@@ -37,7 +37,7 @@ import InstanceCard from '../../src/renderer/src/InstanceCard.vue'
 const CARD = readFileSync(
   join(process.cwd(), 'src', 'renderer', 'src', 'InstanceCard.vue'),
   'utf8'
-)
+) + readFileSync(join(process.cwd(), 'src/renderer/src/styles/InstanceCard.css'), 'utf8')
 
 describe('★ 实例卡片：版本号的位置', () => {
   it('★★ `.ver` 不能有 margin-left:auto（那会把它推到按钮旁边）', () => {

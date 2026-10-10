@@ -2,6 +2,8 @@
 
 NapCat + AstrBot 多开管理器。装环境、建实例、启动、开面板，一个界面搞定。
 
+此项目为 main 分支的 Rust 实现，安装包体积更小，性能占用更低，但是兼容性和稳定性会有所下降。
+
 - [AstrBot](https://github.com/AstrBotDevs/AstrBot) —— 聊天机器人框架
 - [NapCat](https://github.com/NapNeko/NapCatQQ) —— 基于 NTQQ 的协议端
 
@@ -16,7 +18,8 @@ NapCat + AstrBot 多开管理器。装环境、建实例、启动、开面板，
 ## 环境要求
 
 - Windows 10 / 11 (x64)
-- NapCat 需要新版 QQNT
+- 系统 Microsoft Edge WebView2；安装器会在缺失时下载 Bootstrapper
+- NapCat 需要新版 QQNT（当前检测门槛 build ≥40768）
 
 ## 快速开始
 
@@ -35,18 +38,20 @@ NapCat 首次启动需要十余秒完成 QQ 注入。多开只需重复第 2 步
 | 下载失败 | 更换下载源 |
 | 版本列表为空 | 安装对应运行环境 |
 | WebUI 无法打开 | 等待 QQ 注入完成 |
-| 停止后进程仍在 | 再次点击停止 |
+| 停止未确认 | 导出日志排查；未确认停止时不会继续删除、恢复或迁移 |
 | 已装 QQ 但检测不到 | 若修改过安装目录名，重装 QQ 以更新注册表 |
 
 ## 从源码构建
 
-需要 Node.js 20+ 与 pnpm。
+构建需要 Node.js 20+、pnpm、Rust MSVC 工具链，以及 Visual Studio C++ Build Tools 与 Windows SDK。Node.js 仅用于编译 Vue 和运行前端测试。
 
-```bash
+```powershell
 pnpm install
-npm run dev      # 开发
-npm test         # 测试
-npm run dist     # 打包
+pnpm dev          # Tauri + Vue 开发
+pnpm test         # Vue 类型检查、当前 UI/桥接测试、Rust 核心测试
+pnpm check:clippy # Rust 工作区静态检查
+pnpm build        # 编译桌面程序
+pnpm dist         # 生成 NSIS 安装包
 ```
 
 ## 许可

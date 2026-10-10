@@ -99,7 +99,7 @@ describe('FirstRunWizard：拿不到默认路径时不能静默失效', () => {
     expect(w.emitted('confirm')?.[0]).toEqual(['E:\\ok\\data'])
   })
 
-  it('launcher API 完全不存在时也不能静默（打包漏了 preload 的情形）', async () => {
+  it('launcher API 完全不存在时也不能静默（桌面桥接未初始化的情形）', async () => {
     g.window.launcher = {}
     const w = mount(FirstRunWizard)
     await flushPromises()
