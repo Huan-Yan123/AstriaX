@@ -86,7 +86,15 @@ export const createLauncherApi = (transport: LauncherTransport) => ({
   },
   python: {
     status: () => transport.invoke('python:status'),
-    install: () => transport.invoke('python:install'),
+    install: (p?: { base: string; version: string }) => transport.invoke('python:install', p),
+    versions: (p: { base: string; noCache?: boolean }) => transport.invoke('python:versions', p),
+    sources: {
+      state: () => transport.invoke('python:sources'),
+      add: (p: { label: string; base: string }) => transport.invoke('python:sourceAdd', p),
+      remove: (base: string) => transport.invoke('python:sourceRemove', base),
+      pref: (base: string) => transport.invoke('python:sourcePref', base),
+      test: () => transport.invoke('python:sourceTest')
+    },
     discover: () => transport.invoke('python:discover'),
     select: (path: string) => transport.invoke('python:select', path),
     pickFile: () => transport.invoke('python:pickFile')

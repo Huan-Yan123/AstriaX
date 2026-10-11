@@ -102,7 +102,7 @@ export interface LauncherApi {
   }
   python?: {
     status?: () => Promise<import('./python').PythonStatus>
-    install?: () => Promise<import('./python').PythonStatus>
+    install?: (p?: import('./python').PythonDownloadRequest) => Promise<import('./python').PythonStatus>
   }
   onDownloadProgress?: (cb: (p: Progress) => void) => () => void
   /**

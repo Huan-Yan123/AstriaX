@@ -8,4 +8,5 @@ mod pip;
 pub mod python;
 pub mod python_probe;
 pub mod python_selection;
+pub mod python_sources;
 pub mod versions;

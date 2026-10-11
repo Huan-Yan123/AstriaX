@@ -10,13 +10,28 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub const VERSION: &str = "3.12.10";
 pub fn exe(root: &Path) -> PathBuf {
     super::python_selection::exe(root)
 }
 pub fn prepare(dir: &Path) -> Result<()> {
-    let file = dir.join("python312._pth");
-    let raw = fs::read_to_string(&file)?;
+    let files = fs::read_dir(dir)?
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            name.len() > 11
+                && name.starts_with("python")
+                && name.ends_with("._pth")
+                && name[6..name.len() - 5].chars().all(|c| c.is_ascii_digit())
+        })
+        .map(|e| e.path())
+        .collect::<Vec<_>>();
+    if files.len() != 1 {
+        return Err(Error::Invalid(
+            "Python 包应包含一个有效的 pythonXY._pth 配置".into(),
+        ));
+    }
+    let file = &files[0];
+    let raw = fs::read_to_string(file)?;
     let mut lines: Vec<String> = raw
         .lines()
         .map(|s| {
@@ -32,7 +47,7 @@ pub fn prepare(dir: &Path) -> Result<()> {
             lines.push(s.into());
         }
     }
-    atomic_bytes(&file, (lines.join("\n") + "\n").as_bytes())?;
+    atomic_bytes(file, (lines.join("\n") + "\n").as_bytes())?;
     atomic_bytes(
         &dir.join("Lib/site-packages/sitecustomize.py"),
         include_bytes!("../../resources/sitecustomize.py"),
@@ -66,7 +81,7 @@ pub async fn pip_spec(root: &Path, target: &Path, mut args: Vec<String>) -> Resu
         ]),
     })
 }
-pub async fn install(app: &Launcher) -> Result<Value> {
+pub async fn install(app: &Launcher, p: Value) -> Result<Value> {
     let _python = app
         .python_gate
         .try_write()
@@ -74,11 +89,11 @@ pub async fn install(app: &Launcher) -> Result<Value> {
     let task = app
         .tasks
         .begin("python:python".into(), "python", "python", app.emit.clone())?;
-    let result = install_inner(app, &task).await;
+    let result = install_inner(app, &task, &p).await;
     task.finish(&result);
     result
 }
-async fn install_inner(app: &Launcher, task: &crate::tasks::Task) -> Result<Value> {
+async fn install_inner(app: &Launcher, task: &crate::tasks::Task, p: &Value) -> Result<Value> {
     let root = app.root().await;
     let parent = root.join("runtime");
     fs::create_dir_all(&parent)?;
@@ -95,26 +110,18 @@ async fn install_inner(app: &Launcher, task: &crate::tasks::Task) -> Result<Valu
         .prefix(".python-stage-")
         .tempdir_in(&parent)?;
     let archive = stage.path().join("python.zip");
-    let mut downloaded = false;
-    let mut last = None;
-    for url in [
-        format!("https://www.python.org/ftp/python/{VERSION}/python-{VERSION}-embed-amd64.zip"),
-        format!(
-            "https://mirrors.huaweicloud.com/python/{VERSION}/python-{VERSION}-embed-amd64.zip"
-        ),
-    ] {
-        task.check()?;
-        match super::download::to_file(app, &url, &archive, None, task).await {
-            Ok(()) => {
-                downloaded = true;
-                break;
-            }
-            Err(e) => last = Some(e),
-        }
-    }
-    if !downloaded {
-        return Err(last.unwrap_or_else(|| Error::Network("无法下载 Python".into())));
-    }
+    task.progress("start", "读取所选源的 Python 版本", 0, None);
+    let package = tokio::select! { _ = task.token.cancelled() => return Err(Error::Cancelled), result = super::python_sources::resolve(app, p) => result? };
+    let version = package["version"].as_str().unwrap();
+    super::download::to_file(
+        app,
+        package["assetUrl"].as_str().unwrap(),
+        &archive,
+        None,
+        task,
+    )
+    .await?;
+    task.progress("unpack", &format!("解压 Python {version}"), 0, None);
     let dest = stage.path().join("python");
     let zip_path = archive.clone();
     let dest_copy = dest.clone();
@@ -151,12 +158,23 @@ async fn install_inner(app: &Launcher, task: &crate::tasks::Task) -> Result<Valu
         ]),
     };
     crate::network::configure_pip(app, &mut spec).await;
+    let pip_source = crate::sources::selected(&root, true, None)?;
+    spec.args.extend([
+        "--index-url".into(),
+        pip_source["indexUrl"].as_str().unwrap().into(),
+    ]);
     crate::process::run_with_progress(&spec, task, &root.join("logs/python-install.log")).await?;
     let mut check = spec;
     check.args = vec!["-m".into(), "pip".into(), "--version".into()];
     run(&check, &task.token, &root.join("logs/python-install.log")).await?;
     task.check()?;
     let mut python = super::python_probe::probe(&dest.join("python.exe")).await?;
+    if python.version != version {
+        return Err(Error::Invalid(format!(
+            "下载源返回的 Python 版本不符：选择 {version}，实际 {}",
+            python.version
+        )));
+    }
     python.exe = parent.join("python/python.exe");
     python.source = "bundled".into();
     let selection = stage.path().join("python-selection.json");

@@ -55,9 +55,6 @@ pnpm build        # 编译桌面程序
 pnpm dist         # 生成 NSIS 安装包
 pnpm test:installer # 对生成的安装器做隔离安装、升级、卸载验证
 ```
-
-更新发布、卸载数据选项和 Python 切换注意事项见 [安装与更新](docs/install-and-update.md)。实现边界与验证记录见 [重构实施记录](docs/rust-rewrite/implementation.md)。
-
 ## 许可
 
 [MIT](LICENSE)

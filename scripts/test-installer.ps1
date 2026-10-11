@@ -20,7 +20,7 @@ $template = $template.Replace('!define PRODUCTNAME "AstriaX"', ('!define PRODUCT
 $template = $template.Replace('!define BUNDLEID "fun.huanyan.astriax"', ('!define BUNDLEID "' + $scope + '"'))
 $template = $template.Replace('!define MANUFACTURER "huanyan"', ('!define MANUFACTURER "astriax-test-' + $id + '"'))
 $currentVersion = (Get-Content -LiteralPath (Join-Path $repository 'src-tauri/tauri.conf.json') -Raw | ConvertFrom-Json).version
-$previousVersion = '1.0.2'
+$previousVersion = '1.0.3'
 if (-not $template.Contains('!define VERSION "' + $currentVersion + '"')) { throw 'Rendered installer version does not match application config; run pnpm dist first' }
 foreach ($version in @($previousVersion,$currentVersion)) {
     $source = $template.Replace(('!define VERSION "' + $currentVersion + '"'), ('!define VERSION "' + $version + '"')).Replace(('!define VERSIONWITHBUILD "' + $currentVersion + '.0"'), ('!define VERSIONWITHBUILD "' + $version + '.0"'))
@@ -64,6 +64,8 @@ New-Item -ItemType Directory -Path (Join-Path $data 'instances/test/data/plugins
 'upstream runtime' | Set-Content -Encoding utf8 (Join-Path $data 'runtimes/a/test/main.py')
 'unrelated user file' | Set-Content -Encoding utf8 (Join-Path $data 'foreign.txt')
 '{}' | Set-Content -Encoding utf8 (Join-Path $data 'rust-version-cache.json')
+@{pref='https://my.test/python/';custom=@(@{label='自定义 Python';base='https://my.test/python/';builtin=$false})} | ConvertTo-Json -Depth 5 | Set-Content -Encoding utf8 (Join-Path $data 'python-runtime-sources.json')
+'{}' | Set-Content -Encoding utf8 (Join-Path $data 'python-runtime-cache.json')
 New-Item -ItemType Directory -Path (Join-Path $data '.transactions') | Out-Null
 'unrelated app directory file' | Set-Content -Encoding utf8 (Join-Path $install 'user-note.txt')
 $trapScript = Join-Path $sandbox 'old-uninstaller.cmd'
@@ -77,6 +79,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $install 'user-note.txt'))) { throw 
 if ((Get-Content (Join-Path $data 'runtimes/a/test/main.py') -Raw).Trim() -ne 'upstream runtime') { throw 'Upgrade modified the shared runtime' }
 $configuration = Get-Content (Join-Path $data 'config.json') -Raw | ConvertFrom-Json
 if ($configuration.customField -ne '保留') { throw 'Upgrade lost custom config' }
+if ((Get-Content (Join-Path $data 'python-runtime-sources.json') -Raw | ConvertFrom-Json).pref -ne 'https://my.test/python/') { throw 'Upgrade lost custom Python source preference' }
 if ((Get-Content (Join-Path $install 'data-root.txt') -Raw).Trim() -ne $data) { throw 'Upgrade lost custom data root' }
 if (-not (Test-Path -LiteralPath (Join-Path $data 'instances/test/data/plugins/test.txt'))) { throw 'Upgrade lost instance data' }
 $backups = @(Get-ChildItem -LiteralPath (Join-Path $sandbox 'AstriaX-update-backups') -Filter upgrade.zip -File -Recurse)
@@ -91,7 +94,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $data 'config.json'))) { throw 'Keep
 if ((Get-Content (Join-Path $install 'data-root.txt') -Raw).Trim() -ne $data) { throw 'Keep-data uninstall lost pointer' }
 Run-Installer $currentVersion $install
 Run-Uninstaller $install $true
-foreach ($managed in @('config.json','instances','runtimes','rust-version-cache.json','.transactions')) {
+foreach ($managed in @('config.json','instances','runtimes','rust-version-cache.json','python-runtime-sources.json','python-runtime-cache.json','.transactions')) {
     if (Test-Path -LiteralPath (Join-Path $data $managed)) { throw "Delete-data uninstall retained $managed" }
 }
 if (-not (Test-Path -LiteralPath (Join-Path $data 'foreign.txt'))) { throw 'Uninstall deleted an unrelated user file' }

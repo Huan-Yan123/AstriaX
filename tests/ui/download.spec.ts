@@ -81,6 +81,10 @@ function inject(opts: { runtimes?: Array<{ type: 'a' | 'n'; tag: string; sizeMB?
        * 真实主进程装完 Python 之后 status 当然报 ready。
        */
       status: async () => ({ ready: pyReady, version: '3.12.10' }),
+      sources: {
+        state: async () => ({ sources: [{ label: 'Python 官方', base: 'https://www.python.org/ftp/python/', builtin: true }], pref: 'https://www.python.org/ftp/python/' }),
+      },
+      versions: async () => ({ versions: [{ version: '3.12.10', base: 'https://www.python.org/ftp/python/', assetName: 'python-3.12.10-embed-amd64.zip', assetUrl: 'https://www.python.org/ftp/python/3.12.10/python-3.12.10-embed-amd64.zip' }] }),
       install: async () => {
         pyReady = true
         return { ready: true, version: '3.12.10' }
@@ -347,6 +351,9 @@ describe('下载页', () => {
     const b = w.findAll('button').find((x) => x.text() === '下载独立 Python')!
     await b.trigger('click')
     await flushPromises()
+    await flushPromises()
+    expect(w.find('.python-download-dialog').exists()).toBe(true)
+    await w.find('.python-download-dialog .primary').trigger('click')
     await flushPromises()
     /*
      * ★ 文案变更（2026-10-08）：装完之后环境区那一格显示的是

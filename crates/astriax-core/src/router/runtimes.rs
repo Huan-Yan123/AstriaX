@@ -56,7 +56,18 @@ pub(super) async fn dispatch(app: &Launcher, channel: &str, p: Value) -> Result<
         "python:select" => {
             crate::runtime::python_selection::select(app, std::path::Path::new(string(&p)?)).await
         }
-        "python:install" => crate::runtime::python::install(app).await,
+        "python:install" => crate::runtime::python::install(app, p).await,
+        "python:sources" => crate::runtime::python_sources::state(&app.root().await),
+        "python:sourceAdd" | "python:sourceRemove" | "python:sourcePref" => {
+            let store = app.store.lock().await;
+            crate::runtime::python_sources::change(
+                &store.root,
+                channel.split(':').nth(1).unwrap(),
+                p,
+            )
+        }
+        "python:sourceTest" => crate::runtime::python_sources::test(app).await,
+        "python:versions" => crate::runtime::python_sources::versions(app, p).await,
         "qq:status" => Ok(crate::platform::qq_status()),
         "download:sessions" => Ok(json!(app.tasks.snapshot())),
         _ => Err(Error::Unsupported(format!("未知接口：{channel}"))),

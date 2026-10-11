@@ -16,6 +16,8 @@ pub const DATA_ENTRIES: &[&str] = &[
     "runtimes.json",
     "mirrors.json",
     "python-sources.json",
+    "python-runtime-sources.json",
+    "python-runtime-cache.json",
     "update-download.json",
     "rust-version-cache.json",
     ".transactions",
@@ -111,6 +113,7 @@ pub fn create(install: &Path, root: &Path) -> Result<Value> {
                                 | ".transactions"
                                 | ".trash"
                                 | "rust-version-cache.json"
+                                | "python-runtime-cache.json"
                         )
                     )
                 })

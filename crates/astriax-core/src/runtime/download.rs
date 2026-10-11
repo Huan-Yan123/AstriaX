@@ -42,7 +42,15 @@ pub async fn to_file(
 ) -> Result<()> {
     crate::sources::url(url)?;
     let client = crate::network::client(app).await?;
-    task.progress("downloading", "正在连接下载服务器", 0, None);
+    let filename = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|u| {
+            u.path_segments()
+                .and_then(|mut s| s.next_back())
+                .map(str::to_owned)
+        })
+        .unwrap_or_else(|| "资源".into());
+    task.progress("downloading", &format!("正在连接：{filename}"), 0, None);
     let response = tokio::select! { _ = task.token.cancelled() => return Err(Error::Cancelled), r = client.get(url).send() => r? }.error_for_status()?;
     let total = response.content_length();
     let mut stream = response.bytes_stream();
@@ -63,7 +71,7 @@ pub async fn to_file(
         hash.update(&chunk);
         out.write_all(&chunk).await?;
         if last.elapsed().as_millis() >= 100 {
-            task.progress("downloading", "下载中", got, total);
+            task.progress("downloading", &format!("下载 {filename}"), got, total);
             last = std::time::Instant::now();
         }
     }

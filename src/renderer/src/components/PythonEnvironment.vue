@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { PythonStatus } from '../types/python'
-const props = defineProps<{ status: PythonStatus | null; downloading: boolean }>()
-const emit = defineEmits<{ changed: [status: PythonStatus]; download: [] }>()
+import type { Progress } from '../types/runtime-center'
+import PythonDownloadProgress from './PythonDownloadProgress.vue'
+const props = defineProps<{ status: PythonStatus | null; downloading: boolean; progress?: Progress; installError?: string }>()
+const emit = defineEmits<{ changed: [status: PythonStatus]; download: []; cancel: [] }>()
 const path = ref('')
 const busy = ref(false)
 const error = ref('')
@@ -41,6 +43,7 @@ const labels = { system: '系统 Python', manual: '指定路径', bundled: '独�
     <label class="python-path"><span>解释器路径</span><div><input v-model="path" placeholder="例如 C:\Python312\python.exe" :disabled="busy || downloading" /><button :disabled="busy || downloading" @click="choose('browse')">浏览</button><button :disabled="!path.trim() || busy || downloading" @click="choose('select')">应用</button></div></label>
     <div class="python-actions"><button :disabled="busy || downloading" @click="choose('discover')">{{ busy ? '检测中…' : '重新检测系统 Python' }}</button><button :disabled="busy || downloading" @click="emit('download')">{{ downloading ? '下载中…' : '下载独立 Python' }}</button></div>
     <p v-if="error || (!status?.ready && status?.reason)" class="python-error" role="alert">{{ error || status?.reason }}</p>
+    <PythonDownloadProgress :progress="progress" :busy="downloading" :error="installError" @cancel="emit('cancel')" />
     <p class="python-note">依赖安装在 AstrBot 运行时目录。更换 Python 主次版本后，需要重新安装相应 AstrBot 版本。</p>
   </div>
 </template>

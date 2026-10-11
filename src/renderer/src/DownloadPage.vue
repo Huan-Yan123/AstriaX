@@ -2,7 +2,8 @@
 import BrandIcon from './components/BrandIcon.vue'
 import NetworkProxy from './components/NetworkProxy.vue'
 import PythonEnvironment from './components/PythonEnvironment.vue'
-import type { PythonStatus } from './types/python'
+import PythonDownloadDialog from './components/PythonDownloadDialog.vue'
+import type { PythonStatus, PythonDownloadRequest } from './types/python'
 import { usePythonSources } from './composables/usePythonSources'
 
 import { useGithubSources } from './composables/useGithubSources'
@@ -69,7 +70,8 @@ const note = ref('')
  * 一起变成"下载中"，看着像全都在装——这里按「类型|版本」精确记。
  */
 const busyKeys = ref<Set<string>>(new Set())
-const pyBusy = ref(false)
+const pyRequestBusy = ref(false)
+const pyBusy = computed(() => pyRequestBusy.value || !!pythonProgress.value && !['done', 'error'].includes(pythonProgress.value.phase))
 
 function keyOf(type: 'a' | 'n', tag: string): string {
   return `${type}|${tag}`
@@ -381,20 +383,36 @@ async function install(v: VersionItem): Promise<void> {
   }
 }
 
-async function installPython(): Promise<void> {
-  pyBusy.value = true
+const showPythonDownload = ref(false)
+const pythonInstallError = ref('')
+const pythonProgress = computed(() => progressList.value.find(p => p.type === 'python'))
+async function cancelPython(): Promise<void> {
+  if (pythonProgress.value) await cancelTask(pythonProgress.value)
+  else await api().runtimes?.cancel?.({ type: 'python', tag: 'python' })
+}
+async function installPython(options: PythonDownloadRequest): Promise<void> {
+  if (pyBusy.value) return
+  pyRequestBusy.value = true
+  pythonInstallError.value = ''
   err.value = ''
   try {
-    py.value = (await api().python?.install?.()) ?? py.value
+    py.value = (await api().python?.install?.(options)) ?? py.value
 
     dlInvalidate({ keepProbe: true })
     await reload()
 
     await loadEnvironment()
+    showPythonDownload.value = false
+    if (needPython.value && pythonReady()) {
+      const pending = needPython.value
+      needPython.value = null
+      openPickByBase(pending.type, pending.indexUrl)
+    }
   } catch (e) {
     err.value = e instanceof Error ? e.message : String(e)
+    pythonInstallError.value = err.value
   } finally {
-    pyBusy.value = false
+    pyRequestBusy.value = false
   }
 }
 async function pythonChanged(status: PythonStatus): Promise<void> {
@@ -402,25 +420,6 @@ async function pythonChanged(status: PythonStatus): Promise<void> {
   dlInvalidate({ keepProbe: true })
   await reload()
   await loadEnvironment()
-}
-
-/**
- * 引导弹窗里的「安装 Python」。
- *
- * 装成功之后**自动继续**进用户原本想去的那个源的版本列表 ——
- * 这才是"点下载"的完整意图。否则用户装完还要再点一次下载，
- * 而我们明明已经知道他要装 AstrBot。
- *
- * 装完不自动进列表的情况：安装失败，或 py 状态没变成 ready
- *（不能凭"调用没抛错"就当作装好了，那会跳到一个装不了东西的列表）。
- */
-async function installPythonFromDialog(): Promise<void> {
-  const pending = needPython.value
-  await installPython()
-  if (!pending) return
-  if (!pythonReady()) return
-  needPython.value = null
-  openPickByBase(pending.type, pending.indexUrl)
 }
 
 const { delTarget, deleting, cancelRemove, delUsedBy, delRunning, askRemove, doRemove } = useRuntimeRemoval(api, { err, note, picking, reload, loadVersions })
@@ -625,7 +624,7 @@ onUnmounted(() => {
             <div class="environment-cell"><span>Python</span><b class="env-stack"><i :class="{ good: py?.ready }" />{{ environment?.python ?? '检测中…' }}</b></div>
             <div class="environment-cell"><span>QQ</span><b class="env-stack" :title="qq?.reason"><i :class="{ good: qq?.ok }" />{{ environment?.qq ?? '未检测' }}</b><div class="env-actions"><button v-if="qq && !qq.ok" class="row-action primary env-action" @click="openQQDownload">下载 QQ</button></div></div>
           </div>
-          <PythonEnvironment :status="py" :downloading="pyBusy" @changed="pythonChanged" @download="installPython" />
+          <PythonEnvironment :status="py" :downloading="pyBusy" :progress="pythonProgress" :install-error="pythonInstallError" @changed="pythonChanged" @download="showPythonDownload = true" @cancel="cancelPython" />
         </section>
 
         <section class="resource-section source-section">
@@ -701,7 +700,8 @@ onUnmounted(() => {
       </div><p v-if="err" class="picker-error" role="alert">{{ err }}</p>
     </div></div></Transition>
     <Transition name="pop"><div v-if="delTarget" class="mask" @click.self="cancelRemove"><div class="dlg small" :aria-busy="deleting"><h2>删除 {{ delTarget.type === 'a' ? 'AstrBot' : 'NapCat' }} {{ delTarget.tag }}？</h2><p class="sub">{{ deleting ? '正在移除版本，剩余文件将在后台清理…' : delRunning.length ? `有 ${delRunning.length} 个实例正在使用，需先停止它们。` : delUsedBy.length ? `有 ${delUsedBy.length} 个实例引用此版本，删除后需要重新选择版本。` : '运行时文件将被删除。' }}</p><div class="row"><button class="tool-btn" :disabled="deleting" @click="cancelRemove">取消</button><button class="action-btn danger" :disabled="deleting || delRunning.length > 0" @click="doRemove">{{ deleting ? '删除中…' : '删除' }}</button></div></div></div></Transition>
-    <Transition name="pop"><div v-if="needPython" class="mask" @click.self="needPython = null"><div class="dlg small">
+    <PythonDownloadDialog v-if="showPythonDownload" :busy="pyBusy" :progress="pythonProgress" :install-error="pythonInstallError" @close="showPythonDownload = false" @install="installPython" @cancel="cancelPython" />
+    <Transition name="pop"><div v-if="needPython && !showPythonDownload" class="mask" @click.self="needPython = null"><div class="dlg small">
       <h2>要先装 Python 呀</h2>
       <p class="sub">
         AstrBot 需要可用的 Python 3.12+。可在运行环境中自动检测、指定路径或下载安装。
@@ -709,7 +709,7 @@ onUnmounted(() => {
       </p>
       <div class="row">
         <button class="tool-btn" @click="needPython = null">知道了</button>
-        <button class="action-btn primary" :disabled="pyBusy" @click="installPythonFromDialog">
+        <button class="action-btn primary" :disabled="pyBusy" @click="showPythonDownload = true">
           {{ pyBusy ? '安装中…' : '安装 Python' }}
         </button>
       </div>

@@ -20,6 +20,16 @@ async fn upgrade_snapshots_user_state_preserves_runtime_and_cleans_electron_file
         &json!({"dataRoot":root,"custom":"保留"}),
     )
     .unwrap();
+    atomic_json(
+        &root.join("python-runtime-sources.json"),
+        &json!({"pref":"https://custom.test/python/","custom":[]}),
+    )
+    .unwrap();
+    atomic_json(
+        &root.join("python-runtime-cache.json"),
+        &json!({"cached":true}),
+    )
+    .unwrap();
     fs::create_dir_all(root.join("instances/instance/data/plugins")).unwrap();
     fs::write(
         root.join("instances/instance/data/plugins/中文.txt"),
@@ -29,7 +39,11 @@ async fn upgrade_snapshots_user_state_preserves_runtime_and_cleans_electron_file
     fs::create_dir_all(root.join("runtimes/a/v1")).unwrap();
     fs::write(root.join("runtimes/a/v1/main.py"), "upstream").unwrap();
     fs::create_dir_all(root.join(".trash/deleted-runtime")).unwrap();
-    fs::write(root.join(".trash/deleted-runtime/payload"), "pending cleanup").unwrap();
+    fs::write(
+        root.join(".trash/deleted-runtime/payload"),
+        "pending cleanup",
+    )
+    .unwrap();
     let result = maintenance::prepare(&install, &root, std::process::id())
         .await
         .unwrap();
@@ -43,6 +57,8 @@ async fn upgrade_snapshots_user_state_preserves_runtime_and_cleans_electron_file
         .unwrap();
     assert_eq!(text, "插件数据");
     assert!(zip.by_name("data/runtimes/a/v1/main.py").is_err());
+    assert!(zip.by_name("data/python-runtime-sources.json").is_ok());
+    assert!(zip.by_name("data/python-runtime-cache.json").is_err());
     assert!(zip.by_name("data/.trash/deleted-runtime/payload").is_err());
     assert!(zip.by_name("app/AstriaX.exe").is_ok());
     fs::write(install.join("astriax-desktop.exe"), "new Rust app").unwrap();
@@ -74,6 +90,8 @@ async fn upgrade_snapshots_user_state_preserves_runtime_and_cleans_electron_file
     assert!(!root.join("instances").exists());
     assert!(!root.join("runtimes").exists());
     assert!(!root.join("rust-version-cache.json").exists());
+    assert!(!root.join("python-runtime-sources.json").exists());
+    assert!(!root.join("python-runtime-cache.json").exists());
     assert!(!root.join(".transactions").exists());
     assert!(!root.join(".trash").exists());
     assert!(root.join("unrelated.txt").exists());
