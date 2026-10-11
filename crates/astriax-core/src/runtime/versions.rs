@@ -42,7 +42,9 @@ pub async fn list(app: &Launcher, p: Value) -> Result<Value> {
     let source = crate::sources::selected(
         &root,
         kind == Kind::AstrBot,
-        p["base"].as_str().filter(|s| !s.is_empty() && *s != "pypi"),
+        p["base"]
+            .as_str()
+            .filter(|s| *s != "pypi" && (kind == Kind::NapCat || !s.is_empty())),
     )?;
     let base = source[if kind == Kind::AstrBot {
         "indexUrl"
@@ -75,8 +77,8 @@ pub async fn list(app: &Launcher, p: Value) -> Result<Value> {
             .as_str()
             .unwrap_or("https://pypi.org/pypi/{pkg}/json")
             .replace("{pkg}", "astrbot");
-        let data: Value = app
-            .client
+        let data: Value = crate::network::client(app)
+            .await?
             .get(metadata)
             .timeout(std::time::Duration::from_secs(30))
             .send()
@@ -106,8 +108,8 @@ pub async fn list(app: &Launcher, p: Value) -> Result<Value> {
             items.push(json!({"tag":format!("v{tag}"), "assetName":"pypi:astrbot", "assetUrl":file["url"], "sha256":file["digests"]["sha256"], "sizeMB":file["size"].as_f64().unwrap_or(0.) / 1048576., "publishedAt":file["upload_time_iso_8601"], "prerelease":prerelease, "from":source["label"], "base":base, "kind":"pypi"}));
         }
     } else if source["mode"] == "files" {
-        let data: Value = app
-            .client
+        let data: Value = crate::network::client(app)
+            .await?
             .get(format!("{base}versions.json"))
             .timeout(std::time::Duration::from_secs(30))
             .send()
@@ -128,8 +130,8 @@ pub async fn list(app: &Launcher, p: Value) -> Result<Value> {
             items.push(json!({"tag":tag, "assetName":asset, "assetUrl":target.as_str(), "sha256":item["sha256"], "sizeMB":item["size"].as_f64().unwrap_or(0.) / 1048576., "from":source["label"], "base":base, "kind":"zip"}));
         }
     } else {
-        let data: Value = app
-            .client
+        let data: Value = crate::network::client(app)
+            .await?
             .get(format!(
                 "{base}https://api.github.com/repos/NapNeko/NapCatQQ/releases?per_page=100"
             ))

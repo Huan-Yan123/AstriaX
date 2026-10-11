@@ -75,7 +75,7 @@ export interface LauncherApi {
     remove?: (p: {
       type: 'a' | 'n'
       tag: string
-    }) => Promise<{ usedBy?: string[]; unknownBinding?: string[] } | void>
+    }) => Promise<{ usedBy?: string[]; unknownBinding?: string[]; cleanupPending?: boolean } | void>
     /**
      * 取消一个正在进行的安装/导入。
      *

@@ -11,10 +11,14 @@ export function useGithubSources(api: () => LauncherApi, state: Ref<MirrorState 
   const githubMirrors = computed(() => mirrors.value.filter((m) => m.mode === 'proxy'))
   const mirrorHealth = ref<Map<string, { status: string; ms: number | null; reason?: string }>>(new Map())
   const testing = ref(false)
+  let probeRevision = 0
   async function probeMirrors(): Promise<void> {
+    const revision = ++probeRevision
     testing.value = true
     try {
       const rows = (await api().mirrors?.test?.()) ?? []
+      // Saving a proxy can start a new probe while the previous one is pending.
+      if (revision !== probeRevision) return
       const m = new Map<string, { status: string; ms: number | null; reason?: string }>()
       for (const r of rows) m.set(r.base, { status: r.status, ms: r.ms, reason: r.reason })
       mirrorHealth.value = m
@@ -36,7 +40,7 @@ export function useGithubSources(api: () => LauncherApi, state: Ref<MirrorState 
     } catch {
       /* 探测失败就当没测过，不打扰用户 */
     } finally {
-      testing.value = false
+      if (revision === probeRevision) testing.value = false
     }
   }
 

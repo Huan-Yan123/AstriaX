@@ -19,6 +19,7 @@ pub const DATA_ENTRIES: &[&str] = &[
     "update-download.json",
     "rust-version-cache.json",
     ".transactions",
+    ".trash",
     "instances",
     "runtime",
     "runtimes",
@@ -108,6 +109,7 @@ pub fn create(install: &Path, root: &Path) -> Result<Value> {
                                 | ".astriax.lock"
                                 | ".astriax-maintenance.json"
                                 | ".transactions"
+                                | ".trash"
                                 | "rust-version-cache.json"
                         )
                     )

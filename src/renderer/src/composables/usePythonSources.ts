@@ -23,7 +23,9 @@ export function usePythonSources(err: Ref<string>) {
   )
 
   /** 探测所有 Python 源的通断与延迟（与 probeMirrors 同一形态） */
+  let probeRevision = 0
   async function probePySources(): Promise<void> {
+    const revision = ++probeRevision
     try {
       const l = window as unknown as {
         launcher?: {
@@ -33,6 +35,7 @@ export function usePythonSources(err: Ref<string>) {
         }
       }
       const rows = (await l.launcher?.pysrc?.test?.()) ?? []
+      if (revision !== probeRevision) return
       const m = new Map<string, { status: string; ms: number | null; reason?: string }>()
       for (const r of rows) m.set(r.indexUrl, { status: r.status, ms: r.ms, reason: r.reason })
       pyHealth.value = m

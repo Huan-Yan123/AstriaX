@@ -117,7 +117,7 @@ fn copy(from: &Path, to: &Path, token: &tokio_util::sync::CancellationToken) -> 
         .filter_entry(|e| {
             !matches!(
                 e.file_name().to_str(),
-                Some(".astriax.lock" | ".transactions")
+                Some(".astriax.lock" | ".transactions" | ".trash")
             )
         })
     {

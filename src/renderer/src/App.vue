@@ -12,6 +12,8 @@ import SettingsPanel from './SettingsPanel.vue'
 import DownloadPage from './DownloadPage.vue'
 import AppDialog from './AppDialog.vue'
 import TitleBar from './components/TitleBar.vue'
+import AppIcon from './components/AppIcon.vue'
+import BrandIcon from './components/BrandIcon.vue'
 // 搬家后要整份清掉下载页的 SWR 缓存（它存的数据都跟着数据根走）
 import { dlInvalidate } from './dl-cache'
 // 顶部标题栏品牌标记：复用软件图标，避免侧栏再重复显示一次。
@@ -29,12 +31,31 @@ const list = ref<Instance[]>([])
 const wizardOpen = ref(false)
 
 const firstRun = ref<boolean | null>(null)
-const settingsOpen = ref(false)
+const navigation = ref(['a'])
+const navigationIndex = ref(0)
+const route = computed(() => navigation.value[navigationIndex.value])
+const settingsOpen = computed(() => route.value.startsWith('settings:'))
+const settingsSection = computed(() => route.value.split(':')[1] || 'general')
+const sidebarCollapsed = ref(false)
+const lastInstancePage = ref<'a' | 'n'>('a')
+function navigate(to: string): void {
+  if (route.value === to) return
+  navigation.value = [...navigation.value.slice(0, navigationIndex.value + 1), to]
+  navigationIndex.value = navigation.value.length - 1
+  if (to === 'a' || to === 'n') lastInstancePage.value = to
+}
+function travel(delta: number): void {
+  const next = navigationIndex.value + delta
+  if (next >= 0 && next < navigation.value.length) {
+    navigationIndex.value = next
+    if (route.value === 'a' || route.value === 'n') lastInstancePage.value = route.value
+  }
+}
 const busy = ref(false)
 /** 启动阶段就失败了（读配置抛错等）——必须让用户看见，不能静默吞掉 */
 const bootErr = ref('')
 // 页签：AstrBot / NapCat 各自独立页面（用户决策）
-const page = ref<'a' | 'n' | 'download'>('a')
+const page = computed<'a' | 'n' | 'download'>(() => route.value === 'download' ? 'download' : route.value === 'n' ? 'n' : route.value === 'a' ? 'a' : lastInstancePage.value)
 
 interface SwitchPerfEntry {
   to: string
@@ -45,10 +66,9 @@ const switchPerf: SwitchPerfEntry[] = []
 ;(window as unknown as { __astriaxSwitchPerf?: SwitchPerfEntry[] }).__astriaxSwitchPerf = switchPerf
 
 function switchPage(to: 'a' | 'n' | 'download'): void {
-  settingsOpen.value = false
-  if (page.value === to) return
+  if (route.value === to) return
   const t0 = performance.now()
-  page.value = to
+  navigate(to)
   // 下一帧再量：组件的挂载/渲染都发生在这之后
   requestAnimationFrame(() => {
     const ms = Math.round(performance.now() - t0)
@@ -223,7 +243,6 @@ async function finishFirstRun(dataRoot: string): Promise<void> {
 }
 
 async function onMoved(): Promise<void> {
-  settingsOpen.value = false
 
   dlInvalidate()
   await refresh()
@@ -297,7 +316,7 @@ async function create(payload: {
   try {
     await api().create(payload)
     wizardOpen.value = false
-    page.value = payload.type === 'a' ? 'a' : 'n'
+    navigate(payload.type)
     await refresh()
   } catch (e) {
     // 创建失败直接弹窗说明（重名/端口占用/QQ 环境不满足等），不再无声吞掉
@@ -420,7 +439,7 @@ const winApi = () => (window as unknown as { launcher?: { windowCtl?: { minimize
 <template>
   <div class="shell">
     <!-- 融合式标题栏：无边框窗口控制 + 液态玻璃效果 -->
-    <TitleBar />
+    <TitleBar :can-back="navigationIndex > 0" :can-forward="navigationIndex < navigation.length - 1" :sidebar-collapsed="sidebarCollapsed" @back="travel(-1)" @forward="travel(1)" @sidebar="sidebarCollapsed = !sidebarCollapsed" />
     <div v-if="desktopError" class="desktop-error" role="alert">
       {{ desktopError }} <button @click="desktopError = ''">关闭提示</button>
     </div>
@@ -432,39 +451,22 @@ const winApi = () => (window as unknown as { launcher?: { windowCtl?: { minimize
       <button class="webbtn" @click="closeAllWebUi">退出 WebUI</button>
     </div>
     <div class="body">
-    <aside class="rail">
-      <p class="rail-heading">工作区</p>
-      <label class="rail-search"><span aria-hidden="true">⌕</span><input v-model="search" aria-label="搜索实例" placeholder="搜索实例" /></label>
+    <nav class="menu-rail" aria-label="左菜单栏">
+      <button class="menu-button" :class="{ 'is-active': !settingsOpen && page !== 'download' }" aria-label="实例" data-tooltip="实例" @click="navigate(lastInstancePage)"><AppIcon name="instances" /></button>
+      <button class="menu-button" :class="{ 'is-active': route === 'download' }" aria-label="资源与环境" data-tooltip="资源与环境" @click="navigate('download')"><AppIcon name="download" /></button>
+      <button class="menu-button" :class="{ 'is-active': settingsOpen }" aria-label="设置" data-tooltip="设置" @click="navigate('settings:general')"><AppIcon name="settings" /></button>
+    </nav>
+    <aside v-if="!sidebarCollapsed && !settingsOpen && page !== 'download'" class="rail">
+      <p class="rail-heading">实例</p>
+      <label class="rail-search"><AppIcon name="search" /><input v-model="search" aria-label="搜索实例" placeholder="搜索实例" /></label>
       <div class="railnav">
-        <button class="railbtn" :class="{ 'is-active': !settingsOpen && page === 'a' }" title="AstrBot" @click="switchPage('a')"><span class="navglyph">A</span><span>AstrBot</span></button>
-        <button class="railbtn" :class="{ 'is-active': !settingsOpen && page === 'n' }" title="NapCat" @click="switchPage('n')"><span class="navglyph">N</span><span>NapCat</span></button>
-      </div>
-      <div class="railfoot">
-        <!-- 备份入口按用户要求去掉（功能问题多、意义不大） -->
-        <button class="railbtn" :class="{ 'is-active': !settingsOpen && page === 'download' }" title="下载" @click="switchPage('download')">
-          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-            <path d="M10 2.8v9.4m0 0 3.6-3.6M10 12.2 6.4 8.6M4 16.4h12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-          <span>资源与环境</span>
-        </button>
-        <button class="railbtn" :class="{ 'is-active': settingsOpen }" title="设置" @click="settingsOpen = !settingsOpen">
-          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-            <path
-              d="M8.7 2.5h2.6l.4 1.9a6 6 0 0 1 1.3.75l1.85-.6 1.3 2.25-1.4 1.35a6 6 0 0 1 0 1.5l1.4 1.35-1.3 2.25-1.85-.6a6 6 0 0 1-1.3.75l-.4 1.9H8.7l-.4-1.9a6 6 0 0 1-1.3-.75l-1.85.6-1.3-2.25 1.4-1.35a6 6 0 0 1 0-1.5L3.85 6.8l1.3-2.25 1.85.6a6 6 0 0 1 1.3-.75z"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linejoin="round"
-            />
-            <circle cx="10" cy="10" r="2.1" fill="none" stroke="currentColor" stroke-width="1.4" />
-          </svg>
-          <span>设置</span>
-        </button>
+        <button class="railbtn" :class="{ 'is-active': page === 'a' }" title="AstrBot" @click="switchPage('a')"><BrandIcon type="a" /><span>AstrBot</span></button>
+        <button class="railbtn" :class="{ 'is-active': page === 'n' }" title="NapCat" @click="switchPage('n')"><BrandIcon type="n" /><span>NapCat</span></button>
       </div>
     </aside>
 
     <main class="content" :class="{ 'settings-content': settingsOpen }">
-      <SettingsPanel v-if="settingsOpen && firstRun === false" embedded @close="settingsOpen = false" @moved="onMoved" />
+      <SettingsPanel v-if="settingsOpen && firstRun === false" :section="settingsSection" :sidebar-collapsed="sidebarCollapsed" embedded @navigate="navigate(`settings:${$event}`)" @close="navigate(lastInstancePage)" @moved="onMoved" />
       <template v-else>
       <template v-if="page === 'a' || page === 'n'">
       <Transition name="page" mode="out-in">
@@ -535,7 +537,7 @@ const winApi = () => (window as unknown as { launcher?: { windowCtl?: { minimize
       </template>
 
       <Transition name="page" mode="out-in">
-      <DownloadPage v-if="page === 'download'" />
+      <DownloadPage v-if="page === 'download'" :sidebar-collapsed="sidebarCollapsed" />
       </Transition>
       </template>
     </main>

@@ -30,7 +30,33 @@ impl From<serde_json::Error> for Error {
 }
 impl From<reqwest::Error> for Error {
     fn from(e: reqwest::Error) -> Self {
-        Self::Network(e.to_string())
+        // Display includes only the request URL; retain the underlying TLS/proxy cause.
+        let mut details = vec![e.to_string()];
+        let mut cause = std::error::Error::source(&e);
+        while let Some(error) = cause {
+            let message = error.to_string();
+            if !details.contains(&message) {
+                details.push(message);
+            }
+            cause = error.source();
+        }
+        let detail = details.join("：");
+        let category = if detail.contains("proxy authorization required") {
+            "代理需要身份验证，请检查代理账号与密码"
+        } else if detail.contains("certificate") || detail.contains("UnknownIssuer") {
+            "TLS 证书验证失败，请检查系统信任证书和代理证书"
+        } else if e.is_timeout() {
+            "连接或下载超时，请检查网络与代理端口"
+        } else if e.is_connect() {
+            "连接失败，请检查代理是否启动、端口是否正确及网络是否可用"
+        } else if e.is_status() {
+            "服务器返回错误状态"
+        } else if e.is_body() {
+            "下载连接中断或响应不完整"
+        } else {
+            "网络请求失败"
+        };
+        Self::Network(format!("{category}：{detail}"))
     }
 }
 impl From<zip::result::ZipError> for Error {

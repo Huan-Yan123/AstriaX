@@ -26,10 +26,6 @@ Var AstriaXAction
   SetOutPath "$INSTDIR"
 !macroend
 
-!macro NSIS_HOOK_PREUPGRADE
-  !insertmacro AstriaXPrepare
-!macroend
-
 !macro NSIS_HOOK_PREINSTALL
   !insertmacro AstriaXPrepare
 !macroend

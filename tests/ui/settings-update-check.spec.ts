@@ -52,7 +52,7 @@ describe('设置面板 · 检查更新', () => {
     install({
       check: async () => ({ hasUpdate: true, latestVersion: '0.2.0', url: 'http://x/a.exe', sizeMB: 80 })
     })
-    const w = mount(SettingsPanel, { attachTo: document.body })
+    const w = mount(SettingsPanel, { props: { section: 'updates' }, attachTo: document.body })
     await settle()
 
     findButton('检查更新')!.click()
@@ -70,7 +70,7 @@ describe('设置面板 · 检查更新', () => {
         "Error invoking remote method 'app:checkUpdate': ReferenceError: app is not defined"
       )
     })
-    const w = mount(SettingsPanel, { attachTo: document.body })
+    const w = mount(SettingsPanel, { props: { section: 'updates' }, attachTo: document.body })
     await settle()
 
     findButton('检查更新')!.click()
@@ -86,7 +86,7 @@ describe('设置面板 · 检查更新', () => {
 
   it('★没有更新时不显示任何版本号（不误报新版）', async () => {
     install({ check: async () => ({ hasUpdate: false, currentVersion: '0.1.1' }) })
-    const w = mount(SettingsPanel, { attachTo: document.body })
+    const w = mount(SettingsPanel, { props: { section: 'updates' }, attachTo: document.body })
     await settle()
 
     findButton('检查更新')!.click()
@@ -101,7 +101,7 @@ describe('设置面板 · 检查更新', () => {
 
   it('★当前版本要真的显示出来（不能是「未知」）', async () => {
     install({ version: '0.1.1', check: async () => ({ hasUpdate: false }) })
-    const w = mount(SettingsPanel, { attachTo: document.body })
+    const w = mount(SettingsPanel, { props: { section: 'updates' }, attachTo: document.body })
     await settle()
     await w.vm.$nextTick()
     expect(bodyText(), '版本号没显示出来').toContain('0.1.1')

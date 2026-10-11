@@ -12,6 +12,7 @@ pub async fn set(app: &Launcher, p: Value) -> Result<Value> {
         return Err(Error::Invalid("配置必须是对象".into()));
     }
     validate(&p)?;
+    crate::network::validate(&p)?;
     if let Some(root) = p["dataRoot"].as_str() {
         if Path::new(root) != app.root().await {
             move_root(app, root).await?;
@@ -27,6 +28,10 @@ pub async fn set(app: &Launcher, p: Value) -> Result<Value> {
         if k != "dataRoot" {
             config[k] = v.clone();
         }
+    }
+    crate::network::validate(&config)?;
+    if config["proxyMode"] == "manual" && config["proxyUrl"].as_str().is_none_or(|s| s.is_empty()) {
+        return Err(Error::Invalid("手动代理须填写地址和端口".into()));
     }
     config["dataRoot"] = json!(store.root);
     if config["backupKeep"].is_null() {
@@ -54,7 +59,7 @@ fn validate(p: &Value) -> Result<()> {
     for (k, v) in p.as_object().unwrap() {
         match k.as_str() {
             "closePolicy" => {
-                if !matches!(v.as_str(), Some("tray" | "quit")) {
+                if !matches!(v.as_str(), Some("tray" | "quit" | "ask")) {
                     return Err(Error::Invalid("关闭策略无效".into()));
                 }
             }

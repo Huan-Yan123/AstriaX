@@ -44,7 +44,7 @@ describe('SettingsPanel（固定数据根只读展示）', () => {
     await flushPromises()
 
     // Windows 风格原生单选控件，保留键盘与辅助技术支持。
-    expect(document.body.querySelectorAll('input[type="radio"]').length).toBe(2)
+    expect(document.body.querySelectorAll('input[type="radio"]').length).toBe(3)
     expect(document.body.querySelector('[role="radiogroup"]')?.getAttribute('aria-label')).toBe('关闭行为')
     // 曾经那套「一句话按钮」不该再出现
     expect(bodyText()).not.toContain('点 ✕ 缩回托盘')

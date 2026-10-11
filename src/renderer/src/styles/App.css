@@ -46,3 +46,12 @@
 .page-enter-from, .page-leave-to, .cardpop-enter-from, .cardpop-leave-to { opacity: 0; }
 @media (max-width: 1000px) { .rail { flex-basis: 170px; padding-inline: 10px; } .content { padding: 28px 24px; } .topbar { flex-wrap: wrap; } .topbar h1 { font-size: 24px; } }
 @media (max-width: 700px) { .rail { flex-basis: 64px; padding-inline: 8px; } .rail-heading, .rail-search, .railbtn > span:not(.navglyph) { display: none; } .railbtn { justify-content: center; padding: 0; } .empty { flex-direction: column; } }
+
+.menu-rail { flex: 0 0 64px; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px 6px; }
+.menu-button { position: relative; display: grid; place-items: center; width: 48px; height: 48px; border: 0; border-radius: 14px; background: transparent; color: var(--ink-soft); }
+.menu-button svg { width: 24px; height: 24px; }
+.menu-button:hover, .menu-button.is-active { background: #e6e6e6; color: var(--ink); }
+.menu-button::after { content: attr(data-tooltip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%); padding: 9px 13px; border-radius: 10px; background: #202324; color: #fff; font-size: 13px; white-space: nowrap; pointer-events: none; opacity: 0; z-index: 110; }
+.menu-button:hover::after, .menu-button:focus-visible::after { opacity: 1; }
+.rail { flex-basis: 190px; padding-top: 24px; }
+@media (max-width: 700px) { .rail { flex-basis: 140px; } .rail-heading, .rail-search, .railbtn > span { display: flex !important; } .railbtn { justify-content: flex-start; gap: 8px; } .menu-rail { flex-basis: 56px; } }

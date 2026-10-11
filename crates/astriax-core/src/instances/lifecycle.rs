@@ -135,8 +135,9 @@ pub(super) async fn status(app: &Launcher, id: &str, status: &str) -> Result<()>
     store.save_index()
 }
 pub async fn shutdown(app: &Launcher) -> Result<()> {
-    app.tasks.cancel_all();
     for _ in 0..100 {
+        // A completed deletion may enqueue cleanup while shutdown is waiting.
+        app.tasks.cancel_all();
         if app.tasks.is_empty() {
             break;
         }

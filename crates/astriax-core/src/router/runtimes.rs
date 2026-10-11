@@ -64,20 +64,39 @@ pub(super) async fn dispatch(app: &Launcher, channel: &str, p: Value) -> Result<
 }
 async fn remove_runtime(app: &Launcher, p: Value) -> Result<Value> {
     let kind: Kind = parse(p["type"].clone())?;
-    let tag = segment(arg_string(&p, "tag")?)?;
+    let tag = segment(arg_string(&p, "tag")?)?.to_owned();
     let _runtime = app
-        .runtime_lock(kind, tag)
+        .runtime_lock(kind, &tag)
         .await
         .try_write_owned()
         .map_err(|_| Error::Busy("运行时正在使用".into()))?;
-    let _task = app.tasks.begin(
+    let task = app.tasks.begin(
         format!("{}:{tag}", kind.key()),
         "runtime-management",
-        tag,
+        &tag,
         app.emit.clone(),
     )?;
-    crate::runtime::install::assert_unused(app, kind, tag).await?;
-    let store = app.store.lock().await;
+    crate::runtime::install::assert_unused(app, kind, &tag).await?;
+    let cancellation = task.token.clone();
+    // Disk work belongs on the blocking pool. The global lock covers only the
+    // small atomic commit, never recursive removal of the runtime payload.
+    let store = app.store.clone().lock_owned().await;
+    let result = tokio::task::spawn_blocking(move || commit_remove(&store, kind, &tag, &task))
+        .await
+        .map_err(|e| Error::Storage(e.to_string()))?;
+    if !cancellation.is_cancelled() {
+        app.clean_runtime_trash();
+    }
+    result
+}
+
+fn commit_remove(
+    store: &crate::storage::Store,
+    kind: Kind,
+    tag: &str,
+    task: &crate::tasks::Task,
+) -> Result<Value> {
+    task.check()?;
     let mut used_by = vec![];
     let mut unknown_binding = vec![];
     for instance in store.index.instances.iter().filter(|r| r.kind == kind) {
@@ -87,13 +106,8 @@ async fn remove_runtime(app: &Launcher, p: Value) -> Result<Value> {
             _ => {}
         }
     }
-    for r in &store.index.instances {
-        if r.kind == kind && store.tag(&r.id).is_err() && !crate::process::port_free(r.port).await {
-            return Err(Error::Busy(
-                "运行中的实例版本绑定损坏，不能删除运行时".into(),
-            ));
-        }
-    }
+    // assert_unused already checks owned processes and occupied ports, including
+    // instances whose version binding cannot be read.
     let dir = store.runtime_dir(kind, tag)?;
     if !dir.exists() {
         return Ok(
@@ -109,7 +123,8 @@ async fn remove_runtime(app: &Launcher, p: Value) -> Result<Value> {
     versions.retain(|r| !(r.kind == kind && r.tag == tag));
     let index = stage.path().join("index.json");
     crate::storage::atomic_json(&index, &json!({"versions":versions}))?;
-    crate::transaction::replace(
+    task.check()?;
+    crate::transaction::replace_deferred(
         &store.root,
         vec![
             (empty, dir.clone()),
@@ -117,5 +132,7 @@ async fn remove_runtime(app: &Launcher, p: Value) -> Result<Value> {
         ],
     )?;
     fs::remove_dir(dir)?;
-    Ok(json!({"ok":true,"removed":true,"usedBy":used_by,"unknownBinding":unknown_binding}))
+    Ok(
+        json!({"ok":true,"removed":true,"usedBy":used_by,"unknownBinding":unknown_binding,"cleanupPending":true}),
+    )
 }

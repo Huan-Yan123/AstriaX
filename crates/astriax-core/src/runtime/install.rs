@@ -1,6 +1,5 @@
 use crate::{
     domain::{arg_string, parse, segment, Kind, Runtime},
-    process::run,
     storage::{atomic_json, runtime_ready},
     tasks::Task,
     Error, Launcher, Result,
@@ -105,6 +104,35 @@ async fn inner(
             p["base"].as_str().filter(|s| !s.is_empty() && *s != "pypi"),
         )?;
         origin = source["label"].clone();
+        if !imported {
+            let request = super::versions::list(
+                app,
+                json!({"type":kind,"base":p["base"],"includePrerelease":true}),
+            );
+            let versions = tokio::select! { _ = task.token.cancelled() => return Err(Error::Cancelled), result = request => result? };
+            let item = versions
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|v| v["tag"] == tag)
+                .ok_or_else(|| Error::Invalid("指定来源没有此 AstrBot 版本".into()))?;
+            let name = reqwest::Url::parse(arg_string(item, "assetUrl")?)
+                .ok()
+                .and_then(|u| {
+                    u.path_segments()
+                        .and_then(|mut s| s.next_back())
+                        .map(str::to_owned)
+                })
+                .filter(|name| name.ends_with(".whl"))
+                .ok_or_else(|| Error::Invalid("AstrBot 下载地址没有有效 wheel 文件名".into()))?;
+            segment(&name)?;
+            let url =
+                super::download::wheel_url(app, arg_string(&source, "indexUrl")?, &name, task)
+                    .await?;
+            let file = work.path().join(name);
+            super::download::to_file(app, &url, &file, item["sha256"].as_str(), task).await?;
+            wheel = Some(file);
+        }
         let mut args = vec![
             "-m".into(),
             "pip".into(),
@@ -128,10 +156,11 @@ async fn inner(
             args.push(format!("astrbot=={}", tag.trim_start_matches('v')));
         }
         task.progress("unpack", "使用所选 Python 源安装完整依赖", 0, None);
-        let spec = super::python::pip_spec(&root, &stage, args).await?;
-        run(
+        let mut spec = super::python::pip_spec(&root, &stage, args).await?;
+        crate::network::configure_pip(app, &mut spec).await;
+        crate::process::run_with_progress(
             &spec,
-            &task.token,
+            task,
             &root.join("logs").join(format!("install-a-{tag}.log")),
         )
         .await?;

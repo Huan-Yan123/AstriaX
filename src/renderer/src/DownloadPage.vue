@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import BrandIcon from './components/BrandIcon.vue'
+import NetworkProxy from './components/NetworkProxy.vue'
 import PythonEnvironment from './components/PythonEnvironment.vue'
 import type { PythonStatus } from './types/python'
 import { usePythonSources } from './composables/usePythonSources'
@@ -35,6 +37,7 @@ const QQ_DOWNLOAD_URL = 'https://im.qq.com/pcqq/index.shtml'
 
 import type { Mirror, MirrorState, VersionItem, RuntimeVersion, Progress, LauncherApi } from './types/runtime-center'
 
+defineProps<{ sidebarCollapsed?: boolean }>()
 const api = (): LauncherApi => ((window as unknown as { launcher?: LauncherApi }).launcher ?? {})
 
 const state = ref<MirrorState | null>(null)
@@ -47,6 +50,12 @@ const py = ref<PythonStatus | null>(null)
  */
 const { progressList, cancelling, isStalled, elapsedSec, trackKey, setProgress, cancelTask } = useDownloadProgress({ cancel: payload => api().runtimes?.cancel?.(payload), reload })
 
+function taskFor(type: 'a' | 'n', tag: string): Progress | undefined { return progressList.value.find(p => p.type === type && p.tag === tag) }
+async function proxySaved(): Promise<void> {
+  dlInvalidate()
+  mirrorHealth.value = new Map()
+  await Promise.all([probeBoth(), loadVersions(true)])
+}
 const err = ref('')
 /*
  * 删除成功后的**非错误**提示（比如"某个实例的版本记录损坏了"）。
@@ -66,7 +75,8 @@ function keyOf(type: 'a' | 'n', tag: string): string {
   return `${type}|${tag}`
 }
 function isBusy(type: 'a' | 'n', tag: string): boolean {
-  return busyKeys.value.has(keyOf(type, tag))
+  const task = taskFor(type, tag)
+  return busyKeys.value.has(keyOf(type, tag)) || !!task && task.phase !== 'done' && task.phase !== 'error'
 }
 function markBusy(type: 'a' | 'n', tag: string, on: boolean): void {
   const next = new Set(busyKeys.value)
@@ -351,6 +361,7 @@ async function loadVersions(force = false): Promise<void> {
 async function install(v: VersionItem): Promise<void> {
   const t = pickType.value
   markBusy(t, v.tag, true)
+  setProgress({ type: t, tag: v.tag, phase: 'start', percent: null, gotText: '', speedText: '', label: '正在连接下载服务器' })
   err.value = ''
   try {
 
@@ -359,10 +370,12 @@ async function install(v: VersionItem): Promise<void> {
       tag: v.tag,
       base: picking.value?.indexUrl ?? picking.value?.base
     })
+    setProgress({ type: t, tag: v.tag, phase: 'done', percent: 100, gotText: '', speedText: '', label: '安装完成' })
     await reload()
     await loadVersions()
   } catch (e) {
     err.value = e instanceof Error ? e.message : String(e)
+    setProgress({ type: t, tag: v.tag, phase: 'error', percent: null, gotText: '', speedText: '', error: err.value, label: '下载 / 安装失败' })
   } finally {
     markBusy(t, v.tag, false)
   }
@@ -410,7 +423,7 @@ async function installPythonFromDialog(): Promise<void> {
   openPickByBase(pending.type, pending.indexUrl)
 }
 
-const { delTarget, delUsedBy, delRunning, askRemove, doRemove } = useRuntimeRemoval(api, { err, note, picking, reload, loadVersions })
+const { delTarget, deleting, cancelRemove, delUsedBy, delRunning, askRemove, doRemove } = useRuntimeRemoval(api, { err, note, picking, reload, loadVersions })
 
 /* ---------------- 手动导入 ---------------- */
 
@@ -489,40 +502,43 @@ onUnmounted(() => {
       </div>
     </header>
 
+    <NetworkProxy @saved="proxySaved" />
+    <div v-if="sidebarCollapsed" class="resource-tabs"><button class="tool-btn" @click="selectResource('a')"><BrandIcon type="a" />AstrBot</button><button class="tool-btn" @click="selectResource('n')"><BrandIcon type="n" />NapCat</button></div>
     <p v-if="note" class="notice">{{ note }}</p>
 
     <section v-if="progressList.length" class="task-strip">
       <div class="strip-label"><span class="live-dot" />正在进行</div>
       <div class="task-list">
         <div v-for="p in progressList" :key="trackKey(p)" class="task-row">
-          <div class="task-name">{{ p.label ?? p.tag }}</div>
-          <div class="task-state">
+<div class="task-name">{{ p.type === 'a' ? 'AstrBot' : p.type === 'n' ? 'NapCat' : 'Python' }} {{ p.tag }} · {{ p.label || '正在准备' }}</div>
+          <p v-if="p.phase === 'error'" class="task-error" role="alert">{{ p.error || p.label }}</p>
+          <div v-else class="task-state">
 
             <span v-if="isStalled(p)">{{ p.speedText || '处理中' }} · 已用 {{ elapsedSec(p) }} 秒<template v-if="elapsedSec(p) >= 120">（暂时没有新输出是正常的，pip 可能在编译依赖或等待镜像；长时间不变可取消后换源重试）</template><template v-else>（pip 正在处理依赖，没有新输出是正常的，别关软件）</template></span>
             <span v-else-if="p.phase === 'verify'">校验中 · 已用 {{ elapsedSec(p) }} 秒</span>
             <span v-else-if="p.phase === 'finish'">写入中 · 已用 {{ elapsedSec(p) }} 秒</span>
             <span v-else>{{ p.speedText || '下载中' }} · 已用 {{ elapsedSec(p) }} 秒</span>
           </div>
-          <div class="task-progress"><i :style="{ width: (p.phase === 'error' ? 0 : (p.percent ?? 30)) + '%' }" /></div>
+          <progress class="task-progress native-progress" :value="p.percent === null ? undefined : p.percent" max="100" :aria-label="`${p.tag} 下载进度`" />
           <span class="task-percent">{{ p.percent === null ? '—' : `${Math.round(p.percent)}%` }}</span>
           <button v-if="p.phase !== 'done' && p.phase !== 'error'" class="cancelbtn" :disabled="cancelling.has(trackKey(p))" @click="cancelTask(p)">
             {{ cancelling.has(trackKey(p)) ? '取消中' : '取消' }}
           </button>
-          <span v-else class="task-result" :class="p.phase">{{ p.phase === 'done' ? '完成' : '已取消/失败' }}</span>
+          <span v-else class="task-result" :class="p.phase">{{ p.phase === 'done' ? '完成' : '失败 / 已取消' }}</span>
         </div>
       </div>
     </section>
 
-    <div class="console-grid">
-      <aside class="resource-nav">
+    <div class="console-grid" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+      <aside v-if="!sidebarCollapsed" class="resource-nav">
         <div class="nav-title">资源</div>
         <button class="resource-item" :class="{ active: selectedResource === 'a' }" type="button" @click="selectResource('a')">
-          <span class="resource-mark astrbot-mark">A</span>
+          <BrandIcon type="a" />
           <span><b>AstrBot</b><small>Python 运行环境</small></span>
           <strong>{{ installedA.length }}</strong>
         </button>
         <button class="resource-item" :class="{ active: selectedResource === 'n' }" type="button" @click="selectResource('n')">
-          <span class="resource-mark napcat-mark">N</span>
+          <BrandIcon type="n" />
           <span><b>NapCat</b><small>QQ 注入运行环境</small></span>
           <strong>{{ installedN.length }}</strong>
         </button>
@@ -576,12 +592,12 @@ onUnmounted(() => {
           <div class="version-table">
             <div class="table-head"><span>产品</span><span>版本</span><span>来源</span><span>大小</span><span /></div>
             <div v-for="r in visibleInstalled" :key="`${selectedResource}-${r.tag}`" class="version-row">
-              <span class="product-label"><i :class="selectedResource === 'a' ? 'astrbot-dot' : 'napcat-dot'" />{{ selectedResource === 'a' ? 'AstrBot' : 'NapCat' }}</span>
+              <span class="product-label"><BrandIcon :type="selectedResource" />{{ selectedResource === 'a' ? 'AstrBot' : 'NapCat' }}</span>
               <b>{{ r.tag }}</b><span>{{ r.from || '—' }}</span><span>{{ r.sizeMB ? `${r.sizeMB} MB` : '—' }}</span>
               <button class="row-action danger" type="button" @click="askRemove(selectedResource, r.tag)">删除</button>
             </div>
             <div v-for="slot in resourcePlaceholders" :key="`placeholder-${selectedResource}-${slot}`" class="version-row placeholder-row" aria-hidden="true">
-              <span class="product-label"><i :class="selectedResource === 'a' ? 'astrbot-dot' : 'napcat-dot'" />{{ selectedResource === 'a' ? 'AstrBot' : 'NapCat' }}</span><span>等待安装版本</span><span>—</span><span>—</span><span />
+              <span class="product-label"><BrandIcon :type="selectedResource" />{{ selectedResource === 'a' ? 'AstrBot' : 'NapCat' }}</span><span>等待安装版本</span><span>—</span><span>—</span><span />
             </div>
           </div>
           <div class="table-footer">
@@ -669,8 +685,22 @@ onUnmounted(() => {
       </main>
     </div>
 
-    <Transition name="pop"><div v-if="picking" class="mask" @click.self="picking = null"><div class="dlg"><header class="dhead"><h2>{{ picking.label }}</h2><button class="tool-btn" :disabled="loadingVersions" @click="loadVersions(true)">{{ loadingVersions ? '读取中' : '刷新' }}</button><button class="x" @click="picking = null">×</button></header><p v-if="versionSourceHint" class="srcline">{{ versionSourceHint }}</p><div class="vlist"><p v-if="loadingVersions" class="none">正在读取版本列表…</p><p v-else-if="!versions.length" class="none">这个源上没读到版本</p><div v-for="v in versions" :key="v.tag" class="vitem"><div class="vinfo"><b>{{ v.tag }}</b><span v-if="v.prerelease" class="tag warn">测试版</span></div><div class="vright"><span v-if="v.publishedAt" class="meta">{{ v.publishedAt.slice(0, 10) }}</span><button v-if="isInstalled(v.tag)" class="status-chip ready" disabled>已安装</button><button v-else class="action-btn primary" :disabled="isBusy(pickType, v.tag)" @click="install(v)">{{ isBusy(pickType, v.tag) ? '下载中' : '下载' }}</button></div></div></div></div></div></Transition>
-    <Transition name="pop"><div v-if="delTarget" class="mask" @click.self="delTarget = null"><div class="dlg small"><h2>删除 {{ delTarget.type === 'a' ? 'AstrBot' : 'NapCat' }} {{ delTarget.tag }}？</h2><p class="sub">{{ delRunning.length ? `有 ${delRunning.length} 个实例正在使用，需先停止它们。` : delUsedBy.length ? `有 ${delUsedBy.length} 个实例引用此版本，删除后需要重新选择版本。` : '运行时文件将被删除。' }}</p><div class="row"><button class="tool-btn" @click="delTarget = null">取消</button><button class="action-btn danger" :disabled="delRunning.length > 0" @click="doRemove">删除</button></div></div></div></Transition>
+    <Transition name="pop"><div v-if="picking" class="mask" @click.self="picking = null"><div class="dlg">
+      <header class="dhead"><h2>{{ picking.label }}</h2><button class="tool-btn" :disabled="loadingVersions" @click="loadVersions(true)">{{ loadingVersions ? '读取中' : '刷新' }}</button><button class="x" @click="picking = null">×</button></header>
+      <p v-if="versionSourceHint" class="srcline">{{ versionSourceHint }}</p>
+      <div class="vlist"><p v-if="loadingVersions" class="none">正在读取版本列表…</p><p v-else-if="!versions.length" class="none">这个源上没读到版本</p>
+        <div v-for="v in versions" :key="v.tag" class="vitem">
+          <div class="vinfo"><BrandIcon :type="pickType" /><b>{{ v.tag }}</b><span v-if="v.prerelease" class="tag warn">测试版</span></div>
+          <div class="vright"><span v-if="v.publishedAt" class="meta">{{ v.publishedAt.slice(0, 10) }}</span><button v-if="isInstalled(v.tag)" class="status-chip ready" disabled>已安装</button><button v-else class="action-btn primary" :disabled="isBusy(pickType, v.tag)" @click="install(v)">{{ isBusy(pickType, v.tag) ? '下载中' : '下载' }}</button></div>
+          <div v-if="taskFor(pickType, v.tag)" class="version-download" :class="{ failed: taskFor(pickType, v.tag)?.phase === 'error' }">
+            <p>{{ taskFor(pickType, v.tag)?.phase === 'error' ? '下载 / 安装失败' : taskFor(pickType, v.tag)?.label || '下载中' }}</p>
+            <p v-if="taskFor(pickType, v.tag)?.phase === 'error'" role="alert">{{ taskFor(pickType, v.tag)?.error }}</p>
+            <template v-else><progress :value="taskFor(pickType, v.tag)?.percent ?? undefined" max="100" :aria-label="v.tag + ' 下载进度'" /><span>{{ taskFor(pickType, v.tag)?.percent == null ? '处理中…' : Math.round(taskFor(pickType, v.tag)!.percent!) + '%' }} · {{ taskFor(pickType, v.tag)?.gotText }}</span></template>
+          </div>
+        </div>
+      </div><p v-if="err" class="picker-error" role="alert">{{ err }}</p>
+    </div></div></Transition>
+    <Transition name="pop"><div v-if="delTarget" class="mask" @click.self="cancelRemove"><div class="dlg small" :aria-busy="deleting"><h2>删除 {{ delTarget.type === 'a' ? 'AstrBot' : 'NapCat' }} {{ delTarget.tag }}？</h2><p class="sub">{{ deleting ? '正在移除版本，剩余文件将在后台清理…' : delRunning.length ? `有 ${delRunning.length} 个实例正在使用，需先停止它们。` : delUsedBy.length ? `有 ${delUsedBy.length} 个实例引用此版本，删除后需要重新选择版本。` : '运行时文件将被删除。' }}</p><div class="row"><button class="tool-btn" :disabled="deleting" @click="cancelRemove">取消</button><button class="action-btn danger" :disabled="deleting || delRunning.length > 0" @click="doRemove">{{ deleting ? '删除中…' : '删除' }}</button></div></div></div></Transition>
     <Transition name="pop"><div v-if="needPython" class="mask" @click.self="needPython = null"><div class="dlg small">
       <h2>要先装 Python 呀</h2>
       <p class="sub">

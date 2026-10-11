@@ -156,13 +156,14 @@ pub fn selected(root: &Path, python: bool, explicit: Option<&str>) -> Result<Val
 }
 pub async fn test(app: &Launcher, python: bool) -> Result<Value> {
     let st = state(&app.root().await, python)?;
+    let client = crate::network::client(app).await?;
     let mut pending = futures_util::stream::FuturesUnordered::new();
     for source in st[if python { "sources" } else { "mirrors" }]
         .as_array()
         .unwrap()
     {
         let source = source.clone();
-        let client = app.client.clone();
+        let client = client.clone();
         pending.push(async move {
             let start = std::time::Instant::now();
             let target = if python {
@@ -175,35 +176,32 @@ pub async fn test(app: &Launcher, python: bool) -> Result<Value> {
                     source["base"].as_str().unwrap()
                 )
             };
-            let ok = match client
+            let response = client
                 .get(target)
                 .timeout(std::time::Duration::from_secs(10))
                 .send()
-                .await
-            {
-                Ok(r) if r.status().is_success() => {
-                    if python {
-                        r.text()
-                            .await
-                            .map(|s| s.contains("astrbot"))
-                            .unwrap_or(false)
-                    } else {
-                        r.json::<Value>()
-                            .await
-                            .map(|v| v.is_array() || v["napcat"].is_array())
-                            .unwrap_or(false)
+                .await;
+            let result: Result<()> = async {
+                let r = response?.error_for_status()?;
+                if python {
+                    if !r.text().await?.contains("astrbot") {
+                        return Err(Error::Network("所选 Python 源没有 AstrBot 索引".into()));
+                    }
+                } else {
+                    let v = r.json::<Value>().await?;
+                    if !v.is_array() && !v["napcat"].is_array() {
+                        return Err(Error::Network("所选来源返回的版本清单无效".into()));
                     }
                 }
-                _ => false,
-            };
+                Ok(())
+            }
+            .await;
+            let ok = result.is_ok();
+            let reason = result.err().map(|e| e.to_string()).unwrap_or_default();
             let mut result = source;
             result["ok"] = json!(ok);
             result["status"] = json!(if ok { "ok" } else { "down" });
-            result["reason"] = json!(if ok {
-                ""
-            } else {
-                "无法读取上游索引或版本清单"
-            });
+            result["reason"] = json!(reason);
             result["ms"] = json!(start.elapsed().as_millis());
             result
         });

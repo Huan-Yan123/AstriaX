@@ -1,7 +1,6 @@
 use super::install::{assert_unused, register};
 use crate::{
     domain::{arg_string, segment, Kind},
-    process::run,
     storage::runtime_ready,
     Error, Launcher, Result,
 };
@@ -48,12 +47,9 @@ pub async fn install_pip(app: &Launcher, p: Value) -> Result<Value> {
             arg_string(&source, "indexUrl")?.into(),
             spec.into(),
         ];
-        run(
-            &super::python::pip_spec(&root, &payload, args).await?,
-            &task.token,
-            &root.join("logs/pip-install.log"),
-        )
-        .await?;
+        let mut spec = super::python::pip_spec(&root, &payload, args).await?;
+        crate::network::configure_pip(app, &mut spec).await;
+        crate::process::run_with_progress(&spec, &task, &root.join("logs/pip-install.log")).await?;
         task.check()?;
         register(
             app,

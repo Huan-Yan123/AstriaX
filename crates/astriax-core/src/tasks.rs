@@ -125,8 +125,7 @@ impl Task {
         entry.progress["total"] = json!(total);
         entry.progress["percent"] = json!(total
             .filter(|n| *n > 0)
-            .map(|n| (got as f64 / n as f64 * 100.).min(100.))
-            .unwrap_or(0.));
+            .map(|n| (got as f64 / n as f64 * 100.).min(100.)));
         let elapsed = (chrono::Utc::now().timestamp_millis()
             - entry.progress["startedAt"].as_i64().unwrap_or(0))
         .max(1) as f64

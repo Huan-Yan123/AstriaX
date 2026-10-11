@@ -86,7 +86,7 @@ export function useDownloadProgress(options: {
         next.set(trackKey(p), cancelling.value.has(trackKey(p)) && !terminal
             ? { ...p, label: '正在取消，等待后台清理…' } : p);
         progressMap.value = next;
-        if (!startedAt.has(trackKey(p)))
+        if (p.phase === 'start' || !startedAt.has(trackKey(p)))
             startedAt.set(trackKey(p), Date.now());
         markEvent(trackKey(p));
         if (p.phase === 'done' || p.phase === 'error') {
@@ -100,9 +100,7 @@ export function useDownloadProgress(options: {
             void options.reload();
             scheduleClear(trackKey(p), 2500);
         }
-        else if (p.phase === 'error') {
-            scheduleClear(trackKey(p), 6000);
-        }
+
     }
     const pendingClear = new Set<ReturnType<typeof setTimeout>>();
     function scheduleClear(key: string, ms: number): void {

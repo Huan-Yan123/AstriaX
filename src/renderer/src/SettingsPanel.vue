@@ -1,16 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import AppIcon from './components/AppIcon.vue'
 import { useAppUpdates } from './composables/useAppUpdates'
 const { currentVersion, checking, updMsg, updErr, updPct, downloading, skipNote, savedPath, updInfo, checkUpdate, doUpdate, openSaved, skipVersion, installingUpdate, installUpdate } = useAppUpdates()
 
-defineProps<{ embedded?: boolean }>()
+const props = defineProps<{ embedded?: boolean; section?: string; sidebarCollapsed?: boolean }>()
 const settingsSearch = ref('')
-const currentSection = ref('general')
+const currentSection = ref(props.section || 'general')
+watch(() => props.section, value => { if (value) currentSection.value = value })
 const sections = [{ id: 'general', title: '常规' }, { id: 'updates', title: '应用更新' }, { id: 'storage', title: '存储' }, { id: 'diagnostics', title: '日志与反馈' }]
 const matches = (text: string) => !settingsSearch.value.trim() || text.includes(settingsSearch.value.trim())
-function navigate(id: string): void { currentSection.value = id; document.getElementById(`settings-${id}`)?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }) }
+const visibleSections = computed(() => sections.filter(s => matches(s.title + ' ' + ({ general: '关闭行为 托盘 退出 每次询问', updates: '当前版本 检查更新 下载更新 安装', storage: '数据目录 迁移', diagnostics: '日志 反馈 问题 导出' }[s.id] || ''))))
+const sectionTitle = computed(() => sections.find(s => s.id === currentSection.value)?.title || '常规')
+function navigate(id: string): void { currentSection.value = id; emit('navigate', id) }
+watch(settingsSearch, () => { if (visibleSections.value.length && !visibleSections.value.some(s => s.id === currentSection.value)) navigate(visibleSections.value[0].id) })
 
-const emit = defineEmits<{ close: []; moved: [] }>()
+const emit = defineEmits<{ close: []; moved: []; navigate: [section: string] }>()
 
 declare const window: {
   launcher?: {
@@ -33,7 +38,8 @@ const dataRoot = ref('')
 const exporting = ref(false)
 const exportedPath = ref('')
 const exportErr = ref('')
-const closePolicy = ref<'tray' | 'quit' | undefined>(undefined)
+const closePolicy = ref<'tray' | 'quit' | 'ask'>('ask')
+const policyError = ref('')
 
 const OFFICIAL_GROUP = '1077554004'
 
@@ -123,12 +129,15 @@ async function moveDataDir(): Promise<void> {
 onMounted(async () => {
   const cfg = (await window.launcher?.config?.get()) ?? {}
   dataRoot.value = (cfg.dataRoot as string) ?? ''
-  closePolicy.value = cfg.closePolicy as 'tray' | 'quit' | undefined
+  closePolicy.value = cfg.closePolicy === 'tray' || cfg.closePolicy === 'quit' ? cfg.closePolicy : 'ask'
 })
 
-async function setPolicy(p: 'tray' | 'quit'): Promise<void> {
+async function setPolicy(p: 'tray' | 'quit' | 'ask'): Promise<void> {
+  policyError.value = ''
+  const previous = closePolicy.value
   closePolicy.value = p
-  await window.launcher?.config?.set({ closePolicy: p })
+  try { await window.launcher?.config?.set({ closePolicy: p }); closePolicy.value = p }
+  catch (e) { closePolicy.value = previous; policyError.value = e instanceof Error ? e.message : String(e) }
 }
 
 async function exportLogs(): Promise<void> {
@@ -187,26 +196,30 @@ onBeforeUnmount(stopBusyPoll)
 <template>
   <Teleport to="body" :disabled="embedded">
     <div class="settings-shell" :class="{ embedded, modal: !embedded }" @click.self="!embedded && emit('close')">
-      <div class="panel">
-        <aside class="settings-nav">
-          <h2>设置</h2>
-          <label class="settings-search"><span aria-hidden="true">⌕</span><input v-model="settingsSearch" placeholder="搜索设置" aria-label="搜索设置" /></label>
+      <div class="panel" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
+        <aside v-if="!sidebarCollapsed" class="settings-nav">
+          <h2><AppIcon name="settings" /> 设置</h2>
+          <label class="settings-search"><AppIcon name="search" /><input v-model="settingsSearch" placeholder="搜索设置" aria-label="搜索设置" /></label>
           <p class="nav-label">应用</p>
-          <button v-for="section in sections" :key="section.id" class="section-link" :class="{ active: currentSection === section.id }" @click="navigate(section.id)">{{ section.title }}</button>
+          <button v-for="section in visibleSections" :key="section.id" class="section-link" :class="{ active: currentSection === section.id }" @click="navigate(section.id)"><AppIcon :name="section.id" />{{ section.title }}</button>
         </aside>
         <div class="settings-main">
-          <header><h1>常规</h1><button class="close-settings" aria-label="关闭设置" @click="emit('close')">✕</button></header>
-          <section v-show="matches('常规 关闭行为 托盘 退出')" id="settings-general">
-            <h3>关闭行为</h3>
+          <nav v-if="sidebarCollapsed" class="compact-sections" aria-label="设置页面"><button v-for="section in sections" :key="section.id" class="section-link" :class="{ active: currentSection === section.id }" @click="navigate(section.id)"><AppIcon :name="section.id" />{{ section.title }}</button></nav>
+          <p v-if="!visibleSections.length" class="hint">未找到匹配设置</p>
+          <header><h1><AppIcon :name="currentSection" />{{ sectionTitle }}</h1><button class="close-settings" aria-label="关闭设置" @click="emit('close')"><AppIcon name="close" /></button></header>
+          <section v-show="currentSection === 'general' && visibleSections.some(s => s.id === 'general')" id="settings-general">
+            <h3><AppIcon name="general" />关闭行为</h3>
             <div class="card" role="radiogroup" aria-label="关闭行为">
-              <label class="setting-row"><span><b>缩回托盘</b><small>关闭窗口后，实例继续运行。</small></span><input type="radio" name="closepolicy" :checked="closePolicy === 'tray'" @change="setPolicy('tray')" /></label>
-              <label class="setting-row"><span><b>直接退出</b><small>退出前停止所有实例。</small></span><input type="radio" name="closepolicy" :checked="closePolicy === 'quit'" @change="setPolicy('quit')" /></label>
+              <label class="setting-row"><AppIcon name="tray" /><span><b>缩回托盘</b><small>关闭窗口后，实例继续运行。</small></span><input type="radio" name="closepolicy" :checked="closePolicy === 'tray'" @change="setPolicy('tray')" /></label>
+              <label class="setting-row"><AppIcon name="quit" /><span><b>直接退出</b><small>退出前停止所有实例。</small></span><input type="radio" name="closepolicy" :checked="closePolicy === 'quit'" @change="setPolicy('quit')" /></label>
+              <label class="setting-row"><AppIcon name="ask" /><span><b>每次询问</b><small>每次关闭窗口时选择缩回托盘或退出程序。</small></span><input type="radio" name="closepolicy" :checked="closePolicy === 'ask'" @change="setPolicy('ask')" /></label>
             </div>
+            <p v-if="policyError" class="hint err" role="alert">{{ policyError }}</p>
           </section>
-          <section v-show="matches('应用更新 当前版本 检查更新 下载更新 安装')" id="settings-updates">
-            <h3>应用更新</h3>
+          <section v-show="currentSection === 'updates' && visibleSections.some(s => s.id === 'updates')" id="settings-updates">
+            <h3><AppIcon name="updates" />应用更新</h3>
             <div class="card">
-              <div class="setting-row"><span><b>当前版本</b><small>AstriaX {{ currentVersion }}</small></span><button class="pick" :disabled="checking || downloading" @click="checkUpdate(true)">{{ checking ? '检查中…' : '检查更新' }}</button></div>
+              <div class="setting-row"><AppIcon name="updates" /><span><b>当前版本</b><small>AstriaX {{ currentVersion }}</small></span><button class="pick" :disabled="checking || downloading" @click="checkUpdate(true)">{{ checking ? '检查中…' : '检查更新' }}</button></div>
               <p class="hint">更新来源：Soffd/AstriaX · GitHub Releases</p>
               <p v-if="updMsg" class="hint" :class="{ err: updErr }">{{ updMsg }}</p>
               <p v-if="updInfo?.hasUpdate && updInfo.notes" class="notes">{{ updInfo.notes }}</p>
@@ -216,22 +229,22 @@ onBeforeUnmount(stopBusyPoll)
               <p v-if="skipNote" class="hint">{{ skipNote }}</p>
             </div>
           </section>
-          <section v-show="matches('存储 数据目录 迁移')" id="settings-storage">
-            <h3>存储</h3>
+          <section v-show="currentSection === 'storage' && visibleSections.some(s => s.id === 'storage')" id="settings-storage">
+            <h3><AppIcon name="storage" />存储</h3>
             <div class="card">
-              <div class="setting-row"><span><b>数据目录</b><small class="path">{{ dataRoot || '（未设置）' }}</small></span><button class="pick" :disabled="moving" @click="moveDataDir">{{ moving ? '迁移中…' : '迁移目录' }}</button></div>
+              <div class="setting-row"><AppIcon name="storage" /><span><b>数据目录</b><small class="path">{{ dataRoot || '（未设置）' }}</small></span><button class="pick" :disabled="moving" @click="moveDataDir">{{ moving ? '迁移中…' : '迁移目录' }}</button></div>
               <p class="hint">复制实例、运行时和日志到新位置，保留原目录。迁移期间请保持应用运行。</p>
               <p v-if="moving" class="hint">正在迁移，已用 {{ moveElapsedSec }} 秒</p>
               <p v-if="moveNote" class="hint">{{ moveNote }}</p><p v-if="moveErr" class="hint err">{{ moveErr }}</p>
               <ul v-if="moveFailed.length" class="faillist"><li v-for="(f, i) in moveFailed" :key="i"><b>{{ f.item }}</b> — {{ f.reason }}</li></ul>
             </div>
           </section>
-          <section v-show="matches('日志 反馈 问题 导出')" id="settings-diagnostics">
-            <h3>日志与反馈</h3>
+          <section v-show="currentSection === 'diagnostics' && visibleSections.some(s => s.id === 'diagnostics')" id="settings-diagnostics">
+            <h3><AppIcon name="diagnostics" />日志与反馈</h3>
             <div class="card">
-              <div class="setting-row"><span><b>日志</b><small>导出诊断信息，帮助定位问题。</small></span><button class="pick" :disabled="exporting" @click="exportLogs">{{ exporting ? '正在打包…' : '导出日志' }}</button></div>
+              <div class="setting-row"><AppIcon name="diagnostics" /><span><b>日志</b><small>导出诊断信息，帮助定位问题。</small></span><button class="pick" :disabled="exporting" @click="exportLogs">{{ exporting ? '正在打包…' : '导出日志' }}</button></div>
               <p v-if="exportedPath" class="hint path">已生成：{{ exportedPath }}</p><p v-if="exportErr" class="hint err">{{ exportErr }}</p>
-              <div class="setting-row"><span><b>问题反馈群</b><small>反馈问题时可附上导出的日志。</small></span><span class="qqnum">{{ OFFICIAL_GROUP }}</span></div>
+              <div class="setting-row"><AppIcon name="ask" /><span><b>问题反馈群</b><small>反馈问题时可附上导出的日志。</small></span><span class="qqnum">{{ OFFICIAL_GROUP }}</span></div>
             </div>
           </section>
         </div>

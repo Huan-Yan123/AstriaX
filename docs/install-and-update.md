@@ -12,16 +12,18 @@
 
 ```powershell
 pnpm dist
-powershell -ExecutionPolicy Bypass -File scripts/with-msvc.ps1 run -p astriax-core --bin astriax-release -- target/release/bundle/nsis/AstriaX_1.0.2_x64-setup.exe 1.0.2 target/release/bundle/nsis/tauri-latest.json
+powershell -ExecutionPolicy Bypass -File scripts/with-msvc.ps1 run -p astriax-core --bin astriax-release -- target/release/bundle/nsis/AstriaX_1.0.3_x64-setup.exe 1.0.3 target/release/bundle/nsis/tauri-latest.json
 ```
 
-将 `AstriaX_1.0.2_x64-setup.exe` 和 `tauri-latest.json` 上传到 **Soffd/AstriaX** 的同一 Release，标签为 `v1.0.2`；后续版本同时修改工作区 Cargo、package.json、Tauri 配置与应用清单中的版本。该 Release 需要被 GitHub 的 `latest` 地址选中。开发分支名称不影响检测，应用读取 Release 附件。
+将 `AstriaX_1.0.3_x64-setup.exe` 和 `tauri-latest.json` 上传到 **Soffd/AstriaX** 的同一 Release，标签为 `v1.0.3`；后续版本同时修改工作区 Cargo、package.json、Tauri 配置与应用清单中的版本。该 Release 需要被 GitHub 的 `latest` 地址选中。开发分支名称不影响检测，应用读取 Release 附件。
 
 构建与清单生成不会上传或发布。未发布这两个附件时，应用会提示无法读取更新清单，不将失败检测记入 24 小时节流。有效检测仍有 24 小时间隔，手动检查可强制刷新。
 
 下载后显示「退出并安装更新」。点击时再次校验安装包，等待任务取消和受控实例停止，然后退出并启动安装器。下载记录保存在数据根中，再次进入设置或重启应用后仍可安装。安装器不会因为下载完成而自行执行。
 
 ## 升级与备份
+
+1.0.3 安装器支持直接覆盖旧目录。检测到已有安装时默认使用原目录；双击安装包、静默安装、被动安装和应用内更新都不会调用旧卸载器，也不会显示“先卸载再安装”选项。同版本可直接覆盖修复，降级安装会被拒绝。未知用户文件保留，程序文件替换前仍检查运行状态并备份。
 
 NSIS 安装器通过临时提取的 `astriax-maintenance.exe` 调用 Rust 业务核心；辅助程序没有桌面程序的管理员权限清单，且不作为运行依赖安装。维护前检查程序、数据锁与实例端口；仍有运行占用时中止安装或卸载。
 
@@ -59,4 +61,4 @@ pnpm dist
 pnpm test:installer
 ```
 
-安装器脚本使用独立目录、产品名与注册表标识，验证首次安装、模拟版本覆盖升级、保留数据卸载、重装识别原根及删除数据，同时检查升级备份与无关用户文件保留。报告位于 `tmp/installer-smoke-*/report.json`。桌面与上游联网环境的验证边界见 [重构实施记录](rust-rewrite/implementation.md)。
+安装器脚本使用独立目录、产品名与注册表标识，验证首次安装、1.0.2 → 当前版本覆盖升级、同版本修复、降级拦截、保留数据卸载、重装识别原根及删除数据，同时检查升级备份与无关用户文件保留。旧卸载登记指向调用陷阱，确认升级没有运行旧卸载器。报告位于 `tmp/installer-smoke-*/report.json`。桌面与上游联网环境的验证边界见 [重构实施记录](rust-rewrite/implementation.md)。

@@ -254,3 +254,58 @@ pub async fn run(
     }
     result
 }
+
+pub async fn run_with_progress(
+    spec: &LaunchSpec,
+    task: &crate::tasks::Task,
+    log: &std::path::Path,
+) -> Result<()> {
+    let offset = std::fs::metadata(log).map(|m| m.len()).unwrap_or(0);
+    let execution = run(spec, &task.token, log);
+    tokio::pin!(execution);
+    let mut tick = tokio::time::interval(Duration::from_millis(500));
+    let mut previous = String::new();
+    loop {
+        tokio::select! {
+            result = &mut execution => {
+                return match result {
+                    Err(Error::Process(reason)) => {
+                        let tail = output_tail(log, offset).await;
+                        Err(Error::Process(format!("{reason}\n{}", tail.trim())))
+                    }
+                    other => other,
+                };
+            }
+            _ = tick.tick() => {
+                let tail = output_tail(log, offset).await;
+                if let Some(line) = tail.lines().rev().find(|line| !line.trim().is_empty()) {
+                    if line != previous {
+                        previous = line.to_owned();
+                        let label: String = line.chars().take(240).collect();
+                        task.progress(if line.contains("Downloading") { "downloading" } else { "unpack" }, &label, 0, None);
+                    }
+                }
+            }
+        }
+    }
+}
+
+async fn output_tail(log: &std::path::Path, offset: u64) -> String {
+    use tokio::io::AsyncSeekExt;
+    let Ok(mut file) = tokio::fs::File::open(log).await else {
+        return String::new();
+    };
+    let len = file.metadata().await.map(|m| m.len()).unwrap_or(offset);
+    if file
+        .seek(std::io::SeekFrom::Start(
+            offset.max(len.saturating_sub(4096)),
+        ))
+        .await
+        .is_err()
+    {
+        return String::new();
+    }
+    let mut bytes = Vec::new();
+    let _ = file.take(4096).read_to_end(&mut bytes).await;
+    String::from_utf8_lossy(&bytes).into_owned()
+}

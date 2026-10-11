@@ -6,6 +6,10 @@ export function useRuntimeRemoval(api: () => LauncherApi, { err, note, picking, 
     reload: () => Promise<void>; loadVersions: () => Promise<void>
   }) {
   const delTarget = ref<{ type: 'a' | 'n'; tag: string } | null>(null)
+  const deleting = ref(false)
+  function cancelRemove(): void {
+    if (!deleting.value) delTarget.value = null
+  }
 
   /*
    * 点了「删除」时，先算出有哪些实例还在用这个版本，写进确认弹窗里。
@@ -39,6 +43,7 @@ export function useRuntimeRemoval(api: () => LauncherApi, { err, note, picking, 
   })
 
   async function askRemove(type: 'a' | 'n', tag: string): Promise<void> {
+    if (deleting.value) return
     // 每次弹确认前刷一遍实例列表，避免拿旧数据吓人或漏报
     try {
       instancesOfType.value = (await api().instance?.list?.()) ?? []
@@ -52,7 +57,8 @@ export function useRuntimeRemoval(api: () => LauncherApi, { err, note, picking, 
 
   async function doRemove(): Promise<void> {
     const t = delTarget.value
-    if (!t) return
+    if (!t || deleting.value) return
+    deleting.value = true
     err.value = ''
     try {
       const r = await api().runtimes?.remove?.({ type: t.type, tag: t.tag })
@@ -74,14 +80,16 @@ export function useRuntimeRemoval(api: () => LauncherApi, { err, note, picking, 
           `没法确认它到底有没有在用这个版本呢 —— 请在实例卡片上重新选一次版本，` +
           `不然它下次启动可能会失败哦。`
       } else {
-        note.value = ''
+        note.value = `已删除 ${t.tag}，剩余文件将在后台清理，可正常退出。`
       }
       await reload()
       if (picking.value) await loadVersions()
     } catch (e) {
       err.value = e instanceof Error ? e.message : String(e)
       delTarget.value = null
+    } finally {
+      deleting.value = false
     }
   }
-  return { delTarget, delUsedBy, delRunning, askRemove, doRemove }
+  return { delTarget, deleting, cancelRemove, delUsedBy, delRunning, askRemove, doRemove }
 }

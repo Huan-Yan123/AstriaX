@@ -8,6 +8,7 @@ pub mod instances;
 pub mod logs;
 pub mod maintenance;
 pub mod napcat_logs;
+pub mod network;
 pub mod platform;
 pub mod platform_ports;
 pub mod platform_qq;
@@ -48,7 +49,7 @@ impl Launcher {
             .connect_timeout(std::time::Duration::from_secs(15))
             .timeout(std::time::Duration::from_secs(600))
             .build()?;
-        Ok(Self {
+        let app = Self {
             store: Arc::new(Mutex::new(store)),
             processes: Arc::new(process::ProcessManager::default()),
             tasks: Arc::new(tasks::Tasks::default()),
@@ -58,7 +59,39 @@ impl Launcher {
             client,
             emit,
             install_dir,
-        })
+        };
+        app.clean_runtime_trash();
+        Ok(app)
+    }
+    pub fn clean_runtime_trash(&self) {
+        let Ok(lease) = self.root_gate.clone().try_read_owned() else {
+            return;
+        };
+        // Called at startup or just after deletion, while no store guard is held.
+        let Ok(store) = self.store.try_lock() else {
+            return;
+        };
+        let root = store.root.clone();
+        drop(store);
+        if !root.join(".trash").exists() {
+            return;
+        }
+        let Ok(task) = self.tasks.begin(
+            "runtime-cleanup".into(),
+            "runtime-cleanup",
+            "trash",
+            self.emit.clone(),
+        ) else {
+            return;
+        };
+        std::thread::spawn(move || {
+            let _lease = lease;
+            let result = transaction::clean_trash(&root, &task.token);
+            if result.is_err() && !task.token.is_cancelled() {
+                let _ = logs::audit(&root, "runtime:cleanup-pending", false);
+            }
+            // Dropping task acknowledges cancellation to the shutdown flow.
+        });
     }
     pub async fn root(&self) -> PathBuf {
         self.store.lock().await.root.clone()

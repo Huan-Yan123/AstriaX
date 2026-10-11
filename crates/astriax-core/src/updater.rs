@@ -47,7 +47,7 @@ pub async fn check(app: &Launcher, p: Value) -> Result<Value> {
     let raw = crate::distribution::MANIFEST_URL;
     let mut requests = futures_util::stream::FuturesUnordered::new();
     for prefix in crate::distribution::ACCELERATORS {
-        let client = app.client.clone();
+        let client = crate::network::client(app).await?;
         let url = format!("{prefix}{raw}");
         requests.push(async move {
             client
@@ -200,7 +200,7 @@ async fn fastest(app: &Launcher, urls: Vec<String>, task: &crate::tasks::Task) -
     let mut probes = FuturesUnordered::new();
     for url in urls {
         crate::sources::url(&url)?;
-        let client = app.client.clone();
+        let client = crate::network::client(app).await?;
         probes.push(async move {
             let response = client
                 .get(&url)

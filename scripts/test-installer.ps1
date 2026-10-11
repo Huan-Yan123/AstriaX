@@ -1,4 +1,4 @@
-# Compile two isolated test installers from Tauri's rendered NSIS script.
+﻿# Compile isolated predecessor/current installers from Tauri's rendered NSIS script.
 # Product name, bundle id, shortcuts and registry keys are unique per test run.
 $ErrorActionPreference = 'Stop'
 $repository = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
@@ -15,27 +15,32 @@ if (-not $resolved.StartsWith((Join-Path $repository 'tmp/installer-smoke-'), [S
 $uninstallKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\' + $product
 if (Test-Path -LiteralPath $uninstallKey) { throw 'Test product identity already exists' }
 foreach ($name in @('utils.nsh','FileAssociation.nsh','SimpChinese.nsh')) { Copy-Item -LiteralPath (Join-Path $generated $name) -Destination $sandbox }
-$template = Get-Content -LiteralPath (Join-Path $generated 'installer.nsi') -Raw
+$template = Get-Content -LiteralPath (Join-Path $generated 'installer.nsi') -Raw -Encoding UTF8
 $template = $template.Replace('!define PRODUCTNAME "AstriaX"', ('!define PRODUCTNAME "' + $product + '"'))
 $template = $template.Replace('!define BUNDLEID "fun.huanyan.astriax"', ('!define BUNDLEID "' + $scope + '"'))
 $template = $template.Replace('!define MANUFACTURER "huanyan"', ('!define MANUFACTURER "astriax-test-' + $id + '"'))
-foreach ($version in @('1.0.1','1.0.2')) {
-    $source = $template.Replace('!define VERSION "1.0.2"', ('!define VERSION "' + $version + '"')).Replace('!define VERSIONWITHBUILD "1.0.2.0"', ('!define VERSIONWITHBUILD "' + $version + '.0"'))
+$currentVersion = (Get-Content -LiteralPath (Join-Path $repository 'src-tauri/tauri.conf.json') -Raw | ConvertFrom-Json).version
+$previousVersion = '1.0.2'
+if (-not $template.Contains('!define VERSION "' + $currentVersion + '"')) { throw 'Rendered installer version does not match application config; run pnpm dist first' }
+foreach ($version in @($previousVersion,$currentVersion)) {
+    $source = $template.Replace(('!define VERSION "' + $currentVersion + '"'), ('!define VERSION "' + $version + '"')).Replace(('!define VERSIONWITHBUILD "' + $currentVersion + '.0"'), ('!define VERSIONWITHBUILD "' + $version + '.0"'))
     $source = $source.Replace('!define OUTFILE "nsis-output.exe"', ('!define OUTFILE "test-' + $version + '.exe"'))
     $script = Join-Path $sandbox ('test-' + $version + '.nsi')
     [IO.File]::WriteAllText($script, $source, [Text.UTF8Encoding]::new($false))
     Push-Location $sandbox
     try {
-        & $compiler /V2 $script | Out-File -Encoding utf8 (Join-Path $sandbox ('compile-' + $version + '.log'))
+        & $compiler /INPUTCHARSET UTF8 /V2 $script | Out-File -Encoding utf8 (Join-Path $sandbox ('compile-' + $version + '.log'))
         if ($LASTEXITCODE -ne 0) { throw "Test NSIS compilation failed: $version" }
     } finally { Pop-Location }
 }
-function Run-Installer([string]$Version, [string]$Directory) {
+function Run-Installer([string]$Version, [string]$Directory, [string[]]$ExtraArguments = @(), [int]$ExpectedExit = 0) {
     $exe = Join-Path $sandbox ('test-' + $Version + '.exe')
-    $process = Start-Process -FilePath $exe -ArgumentList @('/S','/NS',('/D=' + $Directory)) -WindowStyle Hidden -PassThru
+    $directoryArgument = @()
+    if (-not [string]::IsNullOrEmpty($Directory)) { $directoryArgument = @('/D=' + $Directory) }
+    $process = Start-Process -FilePath $exe -ArgumentList (@('/S','/NS') + $ExtraArguments + $directoryArgument) -WindowStyle Hidden -PassThru
     $null = $process.Handle
     if (-not $process.WaitForExit(60000)) { $process.Kill(); throw 'Test installer timed out' }
-    if ($process.ExitCode -ne 0) { throw "Test installer exited $($process.ExitCode): $sandbox" }
+    if ($process.ExitCode -ne $ExpectedExit) { throw "Test installer exited $($process.ExitCode), expected ${ExpectedExit}: $sandbox" }
 }
 function Run-Uninstaller([string]$Directory, [bool]$DeleteData) {
     $arguments = @('/S')
@@ -50,7 +55,7 @@ function Run-Uninstaller([string]$Directory, [bool]$DeleteData) {
 }
 $install = Join-Path $sandbox 'installed app'
 $data = Join-Path $sandbox 'custom data'
-Run-Installer '1.0.1' $install
+Run-Installer $previousVersion $install
 if (-not (Test-Path -LiteralPath (Join-Path $install 'installation.json'))) { throw 'Fresh install did not register data root' }
 New-Item -ItemType Directory -Path (Join-Path $data 'instances/test/data/plugins'), (Join-Path $data 'runtimes/a/test') -Force | Out-Null
 [IO.File]::WriteAllText((Join-Path $install 'data-root.txt'), $data, [Text.UTF8Encoding]::new($false))
@@ -60,17 +65,31 @@ New-Item -ItemType Directory -Path (Join-Path $data 'instances/test/data/plugins
 'unrelated user file' | Set-Content -Encoding utf8 (Join-Path $data 'foreign.txt')
 '{}' | Set-Content -Encoding utf8 (Join-Path $data 'rust-version-cache.json')
 New-Item -ItemType Directory -Path (Join-Path $data '.transactions') | Out-Null
-Run-Installer '1.0.2' $install
+'unrelated app directory file' | Set-Content -Encoding utf8 (Join-Path $install 'user-note.txt')
+$trapScript = Join-Path $sandbox 'old-uninstaller.cmd'
+[IO.File]::WriteAllText($trapScript, "@echo off`r`necho old uninstaller invoked > `"%~dp0uninstaller-invoked.txt`"`r`nexit /b 91`r`n", [Text.UTF8Encoding]::new($false))
+Set-ItemProperty -LiteralPath $uninstallKey -Name UninstallString -Value ('"' + $env:ComSpec + '" /c ""' + $trapScript + '""')
+# Let the installer recover the original directory from its registration.
+Run-Installer $currentVersion ''
+if (Test-Path -LiteralPath (Join-Path $sandbox 'uninstaller-invoked.txt')) { throw 'Upgrade invoked the previous uninstaller' }
+if ((Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion -ne $currentVersion) { throw 'Upgrade did not update installed version' }
+if (-not (Test-Path -LiteralPath (Join-Path $install 'user-note.txt'))) { throw 'Upgrade deleted an unrelated app directory file' }
+if ((Get-Content (Join-Path $data 'runtimes/a/test/main.py') -Raw).Trim() -ne 'upstream runtime') { throw 'Upgrade modified the shared runtime' }
 $configuration = Get-Content (Join-Path $data 'config.json') -Raw | ConvertFrom-Json
 if ($configuration.customField -ne '保留') { throw 'Upgrade lost custom config' }
 if ((Get-Content (Join-Path $install 'data-root.txt') -Raw).Trim() -ne $data) { throw 'Upgrade lost custom data root' }
 if (-not (Test-Path -LiteralPath (Join-Path $data 'instances/test/data/plugins/test.txt'))) { throw 'Upgrade lost instance data' }
 $backups = @(Get-ChildItem -LiteralPath (Join-Path $sandbox 'AstriaX-update-backups') -Filter upgrade.zip -File -Recurse)
 if ($backups.Count -lt 1) { throw 'Upgrade snapshot was not created' }
+# Same-version repair and application update mode use the same overwrite path.
+Run-Installer $currentVersion $install @('/UPDATE','/P')
+if ((Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion -ne $currentVersion) { throw 'Repair lost the current version' }
+Run-Installer -Version $previousVersion -Directory $install -ExpectedExit 1
+if ((Get-ItemProperty -LiteralPath $uninstallKey).DisplayVersion -ne $currentVersion) { throw 'Rejected downgrade changed the installed version' }
 Run-Uninstaller $install $false
 if (-not (Test-Path -LiteralPath (Join-Path $data 'config.json'))) { throw 'Keep-data uninstall removed config' }
 if ((Get-Content (Join-Path $install 'data-root.txt') -Raw).Trim() -ne $data) { throw 'Keep-data uninstall lost pointer' }
-Run-Installer '1.0.2' $install
+Run-Installer $currentVersion $install
 Run-Uninstaller $install $true
 foreach ($managed in @('config.json','instances','runtimes','rust-version-cache.json','.transactions')) {
     if (Test-Path -LiteralPath (Join-Path $data $managed)) { throw "Delete-data uninstall retained $managed" }
@@ -78,6 +97,6 @@ foreach ($managed in @('config.json','instances','runtimes','rust-version-cache.
 if (-not (Test-Path -LiteralPath (Join-Path $data 'foreign.txt'))) { throw 'Uninstall deleted an unrelated user file' }
 if (-not (Test-Path -LiteralPath $backups[0].FullName)) { throw 'Uninstall removed the upgrade snapshot' }
 if (Test-Path -LiteralPath ('HKCU:\Software\AstriaX\' + $scope)) { throw 'Rust installation registry record remains' }
-$report = @{freshInstall=$true;upgradePreservesData=$true;upgradeSnapshot=$true;keepData=$true;reinstallFindsData=$true;deleteManagedData=$true;foreignFilesRetained=$true;scope=$scope;sandbox=$sandbox}
+$report = @{version=$currentVersion;freshInstall=$true;inPlaceUpgrade=$true;originalDirectoryRecovered=$true;oldUninstallerNeverCalled=$true;sameVersionRepair=$true;downgradeRejected=$true;upgradePreservesData=$true;upgradeSnapshot=$true;keepData=$true;reinstallFindsData=$true;deleteManagedData=$true;foreignFilesRetained=$true;scope=$scope;sandbox=$sandbox}
 $report | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $sandbox 'report.json')
 $report | ConvertTo-Json

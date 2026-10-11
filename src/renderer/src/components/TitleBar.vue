@@ -4,8 +4,11 @@
  * 无边框窗口的标题栏，支持拖拽和窗口控制
  */
 import { ref, onMounted, onUnmounted } from 'vue'
+import AppIcon from './AppIcon.vue'
 import astriaxLogo from '../assets/astriax-logo.png'
 
+defineProps<{ canBack?: boolean; canForward?: boolean; sidebarCollapsed?: boolean }>()
+defineEmits<{ back: []; forward: []; sidebar: [] }>()
 const isMaximized = ref(false)
 
 // 窗口控制 API
@@ -54,6 +57,11 @@ onUnmounted(() => {
 
 <template>
   <div class="titlebar">
+    <div class="titlebar__navigation">
+      <button class="navigation-button" aria-label="后退" title="后退" :disabled="!canBack" @click="$emit('back')"><AppIcon name="back" /></button>
+      <button class="navigation-button" aria-label="前进" title="前进" :disabled="!canForward" @click="$emit('forward')"><AppIcon name="forward" /></button>
+      <button class="navigation-button" :aria-label="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" :title="sidebarCollapsed ? '展开侧边栏' : '收起侧边栏'" :aria-expanded="!sidebarCollapsed" @click="$emit('sidebar')"><AppIcon name="sidebar" /></button>
+    </div>
     <!-- 可拖拽区域 -->
     <div class="titlebar__drag" data-tauri-drag-region>
       <img :src="astriaxLogo" alt="AstriaX" class="titlebar__logo" data-tauri-drag-region />
@@ -108,4 +116,8 @@ onUnmounted(() => {
 .titlebar__btn:hover { background: #e1e1e1; }
 .titlebar__btn--close:hover { background: #c42b1c; color: #fff; }
 .titlebar__btn svg { display: block; }
+.titlebar__navigation { display: flex; gap: 2px; padding-left: 8px; }
+.navigation-button { display: grid; place-items: center; width: 36px; height: 32px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--ink-soft); }
+.navigation-button:hover:not(:disabled) { background: #e8e8e8; color: var(--ink); }
+.navigation-button:disabled { opacity: .3; }
 </style>

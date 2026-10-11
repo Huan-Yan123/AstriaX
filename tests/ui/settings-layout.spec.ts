@@ -21,6 +21,7 @@ it('embeds settings, filters sections, and installs only on an explicit click', 
   expect(wrapper.find('#settings-storage').isVisible()).toBe(true)
   expect(wrapper.find('#settings-updates').isVisible()).toBe(false)
   await wrapper.find('[aria-label="搜索设置"]').setValue('')
+  await wrapper.findAll('button').find(b => b.text() === '应用更新')!.trigger('click')
   await wrapper.findAll('button').find(b => b.text() === '检查更新')!.trigger('click')
   await flushPromises()
   await wrapper.findAll('button').find(b => b.text() === '下载更新')!.trigger('click')

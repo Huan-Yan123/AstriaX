@@ -134,7 +134,7 @@ async fn install_inner(app: &Launcher, task: &crate::tasks::Task) -> Result<Valu
     )
     .await?;
     task.progress("unpack", "安装 pip、setuptools、wheel", 0, None);
-    let spec = LaunchSpec {
+    let mut spec = LaunchSpec {
         program: dest.join("python.exe"),
         args: vec![
             get_pip.to_string_lossy().into_owned(),
@@ -150,7 +150,8 @@ async fn install_inner(app: &Launcher, task: &crate::tasks::Task) -> Result<Valu
             ("PIP_DISABLE_PIP_VERSION_CHECK".into(), "1".into()),
         ]),
     };
-    run(&spec, &task.token, &root.join("logs/python-install.log")).await?;
+    crate::network::configure_pip(app, &mut spec).await;
+    crate::process::run_with_progress(&spec, task, &root.join("logs/python-install.log")).await?;
     let mut check = spec;
     check.args = vec!["-m".into(), "pip".into(), "--version".into()];
     run(&check, &task.token, &root.join("logs/python-install.log")).await?;
