@@ -94,6 +94,8 @@ function mk(
   // AstrBot 还要求内置 Python 就绪（靠它运行）
   mkdirSync(join(root, 'runtime', 'python'), { recursive: true })
   writeFileSync(join(root, 'runtime', 'python', 'python.exe'), '', 'utf8')
+  /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+  mkdirSync(join(root, 'runtime', 'python', 'Lib', 'site-packages', 'pip'), { recursive: true })
   const h = buildHandlers({
     probe: stubProbe,
     processManager: pm,
@@ -279,6 +281,8 @@ describe('IPC handlers（直接调 handler，不开真窗口）', () => {
     seedRuntime(root, 'a')
     mkdirSync(join(root, 'runtime', 'python'), { recursive: true })
     writeFileSync(join(root, 'runtime', 'python', 'python.exe'), '', 'utf8')
+    /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+    mkdirSync(join(root, 'runtime', 'python', 'Lib', 'site-packages', 'pip'), { recursive: true })
     const h2 = buildHandlers({
       probe: stubProbe,
       processManager: pm,
@@ -365,7 +369,8 @@ describe('IPC handlers（直接调 handler，不开真窗口）', () => {
       const h = buildHandlers({ probe: stubProbe, processManager: createProcessManager() })
       await h['config:set']({ dataRoot: bare })
       await expect(h['instance:create']({ type: 'a', name: '没Python' })).rejects.toThrow(
-        /AstrBot 需要先装好 Python 才能运行/
+        /* v1.0.2：文案加了「（含 pip）」—— 门槛已从"解释器在"收紧为"解释器+pip 都在" */
+        /AstrBot 需要先装好 Python/
       )
       // NapCat 自带 Node，不受 Python 影响，照样能建
       seedRuntime(bare, 'n')
@@ -383,6 +388,8 @@ describe('IPC handlers（直接调 handler，不开真窗口）', () => {
       // 造出 runtime/python/python.exe（isPythonReady 只看这个文件在不在）
       mkdirSync(join(ok, 'runtime', 'python'), { recursive: true })
       writeFileSync(join(ok, 'runtime', 'python', 'python.exe'), '', 'utf8')
+      /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+      mkdirSync(join(ok, 'runtime', 'python', 'Lib', 'site-packages', 'pip'), { recursive: true })
       const h = buildHandlers({ probe: stubProbe, processManager: createProcessManager() })
       await h['config:set']({ dataRoot: ok })
       const rec = (await h['instance:create']({ type: 'a' })) as { id: string; port: number }
@@ -459,6 +466,8 @@ describe('IPC handlers（直接调 handler，不开真窗口）', () => {
     const py = join(root, 'runtime', 'python', 'python.exe')
     mkdirSync(join(root, 'runtime', 'python'), { recursive: true })
     writeFileSync(py, '', 'utf8')
+    /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+    mkdirSync(join(root, 'runtime', 'python', 'Lib', 'site-packages', 'pip'), { recursive: true })
     const h = buildHandlers({
       probe: stubProbe,
       processManager: createProcessManager(),
@@ -593,6 +602,8 @@ describe('IPC handlers（直接调 handler，不开真窗口）', () => {
     seedRuntime(root, 'a')
     mkdirSync(join(root, 'runtime', 'python'), { recursive: true })
     writeFileSync(join(root, 'runtime', 'python', 'python.exe'), '', 'utf8')
+    /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+    mkdirSync(join(root, 'runtime', 'python', 'Lib', 'site-packages', 'pip'), { recursive: true })
     const h = buildHandlers({
       probe: stubProbe,
       processManager: createProcessManager(),

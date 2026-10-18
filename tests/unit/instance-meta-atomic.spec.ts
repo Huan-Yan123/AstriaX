@@ -72,6 +72,8 @@ function mk() {
    */
   mkdirSync(join(root, 'runtime', 'python'), { recursive: true })
   writeFileSync(join(root, 'runtime', 'python', 'python.exe'), '', 'utf8')
+  /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+  mkdirSync(join(root, 'runtime', 'python', 'Lib', 'site-packages', 'pip'), { recursive: true })
   // 预置运行时，否则 instance:create 拒绝建空壳
   for (const tag of ['v4.27.0', 'v4.28.0']) {
     mkdirSync(join(root, 'runtimes', 'a', tag), { recursive: true })

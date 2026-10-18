@@ -82,6 +82,8 @@ describe('建实例不复制运行时（省磁盘）', () => {
     // AstrBot 还要求内置 Python 就绪
     mkdirSync(join(root, 'runtime', 'python'), { recursive: true })
     writeFileSync(join(root, 'runtime', 'python', 'python.exe'), '', 'utf8')
+    /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+    mkdirSync(join(root, 'runtime', 'python', 'Lib', 'site-packages', 'pip'), { recursive: true })
 
     const h = buildHandlers({ probe: async () => true, processManager: createProcessManager() })
     await h['config:set']({ dataRoot: root })

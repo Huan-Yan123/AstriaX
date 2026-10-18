@@ -55,6 +55,8 @@ function seedPython() {
   const pyDir = join(root, 'runtime', 'python')
   mkdirSync(pyDir, { recursive: true })
   writeFileSync(join(pyDir, 'python.exe'), '', 'utf8')
+  /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+  mkdirSync(join(pyDir, 'Lib', 'site-packages', 'pip'), { recursive: true })
   return pyDir
 }
 

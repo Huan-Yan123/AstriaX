@@ -124,7 +124,7 @@ import { createPipProgress } from './update/pip-progress'
 
 import { ensureTemplate } from './update/templates'
 
-import { isPythonReady, resolveLaunchSpec } from './runtime/layout'
+import { isPythonUsable, resolveLaunchSpec } from './runtime/layout'
 
 import { patchNapcatWorkerArgv } from './runtime/napcat-patch'
 
@@ -1476,8 +1476,16 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
       }
       // AstrBot 靠内置 Python 跑，没装 Python 就是创建了也起不来，这里一并拦住
 
-      if (p.type === 'a' && !isPythonReady(cfg.dataRoot)) {
-        throw new Error('AstrBot 需要先装好 Python 才能运行——去「下载」页装一下，再创建实例')
+      /*
+       * ★ 用 isPythonUsable（解释器 + pip）而不是 isPythonReady（v1.0.2 修复）。
+       *
+       * pip 缺失时 AstrBot 依赖装不上，实例建出来也起不来
+       *（真实故障：启动报 `No module named 'click'`）。
+       * 这里拦住并提示去装，而「装 Python」现在会自动把 pip 补齐
+       *（见 python:install 与 ensurePip 的 wheel 直装）。
+       */
+      if (p.type === 'a' && !isPythonUsable(cfg.dataRoot)) {
+        throw new Error('AstrBot 需要先装好 Python（含 pip）才能运行——去「下载」页装一下，再创建实例')
       }
       // NapCat 注入 QQ 运行，没装 QQ / 版本太低同样起不来
 
@@ -4081,7 +4089,17 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
       if (!task) throw new Error(`AstrBot ${tag} 上的装库任务已经在了`)
       const signal = task.controller.signal
 
-      const send = (extra: Partial<DownloadProgress> & { phase: DownloadProgress['phase'] }): void => {
+      /*
+       * ★ 类型名必须是 `DownloadProgressEvent`（v1.0.2 顺手修的既有 bug）。
+       *
+       * 原来写的是 `DownloadProgress` —— 那个名字在这个文件里**从未定义过**
+       *（只有 DownloadProgressEvent）。TS2552 会让整个参数类型退化成 any，
+       * 于是这里少传/写错 `phase` 都不会被编译器拦住，直到运行时才发现。
+       * 守卫测试 no-undefined-identifiers.spec.ts 抓出了它。
+       */
+      const send = (
+        extra: Partial<DownloadProgressEvent> & { phase: DownloadProgressEvent['phase'] }
+      ): void => {
         sendDownloadProgress({
           type: 'a',
           tag,
@@ -4842,7 +4860,13 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
     'python:status': () => {
       const { config: cfg } = state()
       const exe = pythonExeFor(cfg.dataRoot)
-      return { ready: existsSync(exe), version: PYTHON_VERSION, exe }
+      /*
+       * ★ 用 isPythonUsable（解释器 + pip）而不是只看 python.exe（v1.0.2 修复）。
+       *
+       * 只查 python.exe 会把「解压成功但 pip 引导失败」的半成品报成就绪，
+       * 界面于是显示"已装好"、用户不再去装，而装依赖时必然全失败。
+       */
+      return { ready: isPythonUsable(cfg.dataRoot), version: PYTHON_VERSION, exe }
     },
     /**
  * 安装内置 Python 3.12（AstrBot 运行必需；NapCat 用自带 node.exe 不需要）
@@ -4852,7 +4876,20 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
       const { config: cfg } = state()
       const dir = pythonDirFor(cfg.dataRoot)
       const exe = pythonExeFor(cfg.dataRoot)
-      if (existsSync(exe)) return { ready: true, version: PYTHON_VERSION, exe }
+      /*
+       * ★ 就绪判据必须是「解释器 + pip 都在」（v1.0.2 修复）。
+       *
+       * 原来这里是 `existsSync(exe)` —— 只要 python.exe 在就直接返回成功，
+       * 完全跳过 pip 引导。真实故障（用户日志 2026-10-18）：
+       *   get-pip.py 因缺 distutils 失败，但 python.exe 已解压到位 →
+       *   用户再点一次安装 → 这里直接报"成功" → 实际 pip/setuptools/wheel
+       *   全缺 → 装 AstrBot 依赖全失败 → 启动报 No module named 'click'。
+       *
+       * 现在 pip 缺失时会**重新走一遍引导**（下面 ensurePip 这版首选
+       * 「pip wheel 直装」，不依赖 get-pip / ensurepip / distutils），
+       * 所以坏掉的 Python 会被自动修好，而不是永远卡在假成功。
+       */
+      if (isPythonUsable(cfg.dataRoot)) return { ready: true, version: PYTHON_VERSION, exe }
       /*
        * ══════════════════════════════════════════════════════════════════
        * ★★ 登记任务，让「取消」按钮真的能取消（主人 2026-10-08 实测）

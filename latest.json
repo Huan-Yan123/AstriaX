@@ -1,8 +1,7 @@
 {
-  "version": "1.0.1",
-  "url": "AstriaX-Setup-1.0.1.exe",
-  "sha256": "786a26ac01873a929a72703ca25ba4e88be3ae8c777dc88ca93874c982dd75ff",
-  "size": 85959211,
-  "releasedAt": "2026-10-08T16:17:29.549Z",
-  "notes": "修复：点「下载更新」报 HTTP 404\n  安装包地址被解析成了仓库根目录（安装包其实在 Releases）。\n  现在从清单取文件名重新拼 Releases 地址，并并发测速选最快的源。\n修复：中文路径下检测不到 QQ（子进程输出按 UTF-8 解，而 Windows 原生命令输出 GBK）\n新增：资源页「安装 pip 库」\n修复：资源页分区序号错乱"
+  "version": "1.0.2",
+  "url": "AstriaX-Setup-1.0.2.exe",
+  "size": 85959376,
+  "sha256": "01e1efb1b3b85f06e803de60b044cf104005ffe6375f36907267a5a96f45f61a",
+  "notes": "修复：内置 Python 装不上 pip，导致 AstrBot 实例起不来\n\n【问题现象】\n部分用户装完内置 Python 后：\n· 装 AstrBot 依赖全部失败，日志报 \"No module named pip\"\n· 创建实例后启动失败，报 \"No module named 'click'\"\n· 系统信息里 Python 关键包显示 pip=缺 setuptools=缺 wheel=缺\n\n【根因】\n1. 备用源 mirrors.aliyun.com/pypi/get-pip.py 是 2021 年的静态副本，\n   内嵌的 pip 版本低于 21.3，启动时要 import distutils；\n   而 Python 3.12 已按 PEP 632 移除该模块，于是必然报\n   ModuleNotFoundError: No module named 'distutils'。\n   → 官方源一旦超时就会切到它，然后怎么重试都装不上 pip。\n\n2. 兜底方案用 python -m ensurepip，但 Windows embed 版\n   根本不包含 ensurepip（官方精简掉了），所以那一路永远失败。\n\n3. 就绪判据只检查 python.exe 在不在。pip 装失败时 python.exe\n   其实已经解压到位了，于是再次点击\"安装 Python\"会直接返回成功\n   （假成功），完全跳过 pip 引导。\n\n【修复】\n· 首选改为「pip wheel 直装」：直接下载 pip 的 wheel 解压进\n  Lib/site-packages。完全绕开 get-pip / ensurepip / distutils\n  三个脆弱点。实测 2.4 秒完成（官方 get-pip 要 59.7 秒）。\n· 删除有问题的阿里云 get-pip 源。国内镜像实测都不提供 get-pip.py\n  （腾讯/华为/中科大 404，清华 403），官方源降为兜底。\n· ensurepip 兜底增加前置探测，不存在就直接跳过，不再白等一轮。\n· 就绪判据拆成两个：isPythonReady（解释器）与 isPythonUsable\n  （解释器 + pip）。建实例、装 Python 改用后者，\n  坏掉的 Python 会被自动修好，而不是永远卡在假成功。\n· 顺手修：ipc.ts 里 DownloadProgress 类型名写错（应为\n  DownloadProgressEvent），该错误会让下载进度的类型检查失效。\n\n【验证】\n· 在干净 embed Python 3.12.10 上做了 A/B 对照实验：\n  官方 get-pip 成功装上 pip 26.2.1；阿里云那份必定失败。\n· 新增真机端到端测试，用真实网络走完整流程（下载 wheel →\n  解压 → python -m pip --version），14.5 秒通过。\n· 单元测试 1039 通过 / 3 失败，那 3 条已在 1.0.1 上验证为既有问题，\n  本次改动零回归。"
 }

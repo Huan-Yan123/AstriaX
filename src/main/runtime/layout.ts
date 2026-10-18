@@ -298,7 +298,43 @@ export function writeLoadNapCatScript(loadPath: string, mainMjs: string): void {
   }
 }
 
-/** 内置 Python 是否就绪（决定卡片上能否启动 AstrBot） */
+/**
+ * 内置 Python 的**解释器**是否就绪。
+ *
+ * ⚠ 它只回答"python.exe 在不在"，**不代表能跑 AstrBot** ——
+ * 缺 pip 时依赖装不上，实例照样起不来。要判断"能不能真用"，
+ * 用下面的 isPythonUsable。
+ *
+ * 保留这个宽松语义是有意的：大量测试夹具用"造个 python.exe"
+ * 表示"环境已就绪"，而那些用例关心的是建实例/迁移等别的逻辑，
+ * 不该被 pip 细节干扰。
+ */
 export function isPythonReady(dataRoot: string): boolean {
   return existsSync(join(pythonDirFor(dataRoot), 'python.exe'))
+}
+
+/**
+ * 内置 Python **是否真能用**（解释器 + pip 都在）—— v1.0.2 新增。
+ *
+ * ## 为什么必须单独有这么一个判据
+ *
+ * 真实故障链（用户日志 2026-10-18）：
+ *   1. get-pip.py 因缺 distutils 失败，但 **python.exe 已经解压到位**
+ *   2. 用户再点「安装 Python」→ 旧代码只查 python.exe → 直接返回成功
+ *      （假成功），完全跳过 pip 引导
+ *   3. 界面显示"已装好"，实际 pip/setuptools/wheel 全缺
+ *   4. 装 AstrBot 依赖全失败 → 启动实例报 `No module named 'click'`
+ *
+ * 所以凡是"接下来要用 pip"的决策点（建实例、装 Python），
+ * 都必须用这个判据而不是 isPythonReady。
+ *
+ * ## 为什么只查目录存在，不真的跑一次 pip
+ *
+ * 这是**同步**判据，用在拦截式检查里（跑进程会阻塞调用点）。
+ * pip 的落点是 `Lib/site-packages/pip`（get-pip 与 wheel 直装都装这里），
+ * 目录在就说明引导成功过。
+ */
+export function isPythonUsable(dataRoot: string): boolean {
+  if (!isPythonReady(dataRoot)) return false
+  return existsSync(join(pythonDirFor(dataRoot), 'Lib', 'site-packages', 'pip'))
 }

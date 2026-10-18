@@ -2,6 +2,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { get as httpsGet } from 'https'
 import { get as httpGet } from 'http'
+/* 解压 pip wheel 复用既有入口（内部处理了 PowerShell 引号转义） */
+import { expandArchive } from '../util/async-exec'
 
 /** 不受 CORS 约束的取文本（主进程专用；重定向跟随） */
 export function nodeGetText(url: string, depth = 0): Promise<string> {
@@ -35,18 +37,184 @@ export function nodeGetText(url: string, depth = 0): Promise<string> {
   })
 }
 
+/**
+ * 不受 CORS 约束的取二进制（主进程专用；重定向跟随）。
+ *
+ * 与 nodeGetText 同一套重定向/超时处理，区别只是**不按 utf8 解码** ——
+ * wheel/zip 这类二进制按 utf8 读会损坏。
+ */
+export function nodeGetBuffer(url: string, depth = 0): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    if (depth > 5) {
+      reject(new Error('重定向过多'))
+      return
+    }
+    const getter = url.startsWith('https:') ? httpsGet : httpGet
+    const req = getter(url, { headers: { 'User-Agent': 'AstriaX' } }, (res) => {
+      const code = res.statusCode ?? 0
+      if (code >= 300 && code < 400 && res.headers.location) {
+        res.resume()
+        resolve(nodeGetBuffer(new URL(res.headers.location, url).toString(), depth + 1))
+        return
+      }
+      if (code !== 200) {
+        res.resume()
+        reject(new Error(`HTTP ${code}`))
+        return
+      }
+      const chunks: Buffer[] = []
+      res.on('data', (c: Buffer) => chunks.push(c))
+      res.on('end', () => resolve(Buffer.concat(chunks)))
+      res.on('error', reject)
+    })
+    req.on('error', reject)
+    req.setTimeout(60000, () => {
+      req.destroy(new Error('请求超时'))
+    })
+  })
+}
+
 /** 内置 Python 版本：与 AstrBot 的 .python-version 对齐 */
 export const PYTHON_VERSION = '3.12.10'
 
-/** 下载源顺序：官方在前，国内镜像兜底（python.org 在国内经常拉不动） */
+/**
+ * 下载源顺序：**国内镜像在前，官方兜底**。
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★ 为什么把官方源挪到最后（用户反馈：「下载 Python 本体慢得要死」）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * 原来是官方 `python.org` 排第一，国内镜像只是"兜底"。
+ * 而下载逻辑是**逐个试、失败才切下一个** —— 所以国内用户实际在
+ * 干等官方源慢吞吞地拉完（它不报错，只是慢，连"失败切换"都不会触发）。
+ *
+ * ## 实测数据（2026-10-18，拉 512KB 测真实吞吐，非 HEAD 延迟）
+ *
+ *   官方 python.org   14279 ms / 512KB = 0.04 MB/s   → 10.6MB 要约 265 秒
+ *   华为云               95 ms / 512KB = 5.26 MB/s   → 10.6MB 约 2 秒
+ *   npmmirror           156 ms / 512KB = 3.21 MB/s   → 约 3 秒
+ *   阿里云              899 ms / 512KB = 0.56 MB/s   → 约 19 秒
+ *
+ * 两者相差 **130 倍**。这就是"慢得要死"的全部原因。
+ *
+ * ## 必须按**吞吐**排序，不能按 HEAD 延迟
+ *
+ * 实测踩到的坑：阿里云的 HEAD 响应最快（198ms），但真实下载吞吐
+ * 只有 0.56 MB/s；而华为云 HEAD 是 246ms（略慢），吞吐却有 5.26 MB/s。
+ * 只测响应头会得出**错误的优先级**，所以顺序按实拉数据来排。
+ *
+ * ## 全部为 https，官方源保留在最后
+ *
+ * 官方源不删：海外用户、或三个镜像同时不可用时，它仍是最终保障。
+ * 前面三个都失败才会轮到它，所以放最后不影响可用性。
+ */
 export const PYTHON_SOURCES = [
-  `https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip`,
+  /* 5.26 MB/s —— 实测最快 */
   `https://mirrors.huaweicloud.com/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip`,
+  /* 3.21 MB/s */
+  `https://npmmirror.com/mirrors/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip`,
+  /* 0.56 MB/s */
   `https://mirrors.aliyun.com/python-release/windows/python-${PYTHON_VERSION}-embed-amd64.zip`,
-  `https://npmmirror.com/mirrors/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip`
+  /* 0.04 MB/s —— 官方兜底 */
+  `https://www.python.org/ftp/python/${PYTHON_VERSION}/python-${PYTHON_VERSION}-embed-amd64.zip`
 ]
 
-export const GET_PIP_URLS = ['https://bootstrap.pypa.io/get-pip.py', 'https://mirrors.aliyun.com/pypi/get-pip.py']
+/**
+ * get-pip.py 的下载源。
+ *
+ * ══════════════════════════════════════════════════════════════════════════
+ * ★ 为什么只剩官方一个源（2026-10-18 实测，v1.0.2 修复）
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * 原来第二个源是 `mirrors.aliyun.com/pypi/get-pip.py`，**它是有毒的**：
+ * 那份是 2021 年的静态副本（1,908,226 字节，比官方小 322KB），
+ * 内嵌 pip < 21.3，启动时要 `import distutils` —— 而 Python 3.12
+ * 已按 PEP 632 **移除**该模块，于是它必然崩：
+ *
+ *     ModuleNotFoundError: No module named 'distutils'
+ *
+ * 后果（真实用户故障）：pip 装不上 → AstrBot 依赖全失败 →
+ * 启动实例报 `No module named 'click'`。
+ *
+ * 对照实验（embed Python 3.12.10，A/B 两份脚本各自跑一遍）：
+ *   阿里云那份 → 退出码 1，distutils 缺失，pip 不可用
+ *   官方那份   → 退出码 0，装上 pip 26.2.1 ✓
+ *
+ * 另外实测：国内镜像**基本都不提供 get-pip.py**
+ *（腾讯云/华为云/中科大 404，清华 403），所以没有可替代的国内源。
+ *
+ * ⚠ 官方源在国内很慢（实测单次下载 59.7 秒，接近 60 秒超时线），
+ *   所以它**不再是首选** —— 首选是下面的「pip wheel 直装」，
+ *   官方 get-pip 只作为最后的兜底。
+ */
+export const GET_PIP_URLS = ['https://bootstrap.pypa.io/get-pip.py']
+
+/**
+ * ══════════════════════════════════════════════════════════════════════════
+ * pip wheel 直装 —— v1.0.2 起的**首选** pip 引导方式
+ * ══════════════════════════════════════════════════════════════════════════
+ *
+ * ## 为什么要有这条路
+ *
+ * get-pip.py 这条路有三个先天问题（全部实测确认）：
+ *   1. 官方源在国内慢（59.7 秒），常撞超时
+ *   2. 唯一的国内替代（阿里云）内嵌老 pip，在 3.12 上必然崩溃
+ *   3. 它的兜底 `-m ensurepip` 在 embed 版上**根本不存在**
+ *
+ * 而 pip 本身就是个纯 Python 包 —— 直接下载它的 wheel、
+ * 解压进 `Lib/site-packages` 就能用，**完全绕开**
+ * get-pip / ensurepip / distutils 这三样东西。
+ *
+ * ## 实测效果（同一台机器、同一个 embed Python 3.12.10）
+ *
+ *   get-pip.py（官方）     59,700 ms，且依赖 distutils 能否可用
+ *   pip wheel 直装          2,368 ms，不依赖任何东西
+ *                              → 装上 pip 26.2.1，`pip install requests` 成功
+ *
+ * ## 为什么用索引页而不是固定 URL
+ *
+ * wheel 的直链里带 hash 路径（`/packages/f3/6e/…`），会随版本变，
+ * 写死必失效。所以先取 simple 索引 HTML，再用正则挑出**版本最高**的
+ * `py3-none-any` wheel —— 这是 PyPI 索引的标准格式，各镜像都一致。
+ *
+ * 三个源按"实测可达性"排：阿里云索引 242ms 可用，其余为兜底。
+ */
+export const PIP_WHEEL_INDEXES = [
+  'https://mirrors.aliyun.com/pypi/web/simple/pip/',
+  'https://mirrors.cloud.tencent.com/pypi/simple/pip/',
+  'https://pypi.org/simple/pip/'
+]
+
+/**
+ * 从 simple 索引 HTML 里挑出**版本最高**的 pip wheel 直链。
+ *
+ * 只认 `py3-none-any`（纯 Python，跨平台），排除 py2 / 平台专属的。
+ * 返回绝对 URL；找不到返回 null。
+ */
+export function pickLatestPipWheel(html: string, baseUrl: string): string | null {
+  const re = /href="([^"]*?pip-([0-9][0-9.]*?)-py3-none-any\.whl[^"]*)"/g
+  let bestVer: number[] | null = null
+  let bestUrl: string | null = null
+  for (const m of html.matchAll(re)) {
+    const ver = m[2].split('.').map((n) => Number(n) || 0)
+    if (!bestVer || compareVersion(ver, bestVer) > 0) {
+      const href = m[1].split('#')[0]
+      bestVer = ver
+      bestUrl = /^https?:/i.test(href) ? href : new URL(href, baseUrl).toString()
+    }
+  }
+  return bestUrl
+}
+
+/** 版本号数组比较：a > b 返回正数 */
+function compareVersion(a: number[], b: number[]): number {
+  const len = Math.max(a.length, b.length)
+  for (let i = 0; i < len; i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0)
+    if (d !== 0) return d
+  }
+  return 0
+}
 
 /** 内置解释器目录：<dataRoot>/runtime/python */
 export function pythonDirFor(dataRoot: string): string {
@@ -208,6 +376,12 @@ export async function ensurePip(deps: {
   runPython: PythonRunner
   fetchText?: (url: string) => Promise<string>
   writeFile?: (path: string, content: string) => void
+  /** 取二进制（wheel 用）。缺省走 nodeGetBuffer */
+  fetchBinary?: (url: string) => Promise<Buffer>
+  /** 写二进制（wheel 用）。缺省直接 writeFileSync */
+  writeBinary?: (path: string, buf: Buffer) => void
+  /** 解压 zip（wheel 用）。缺省走 async-exec 的 expandArchive */
+  extract?: (zip: string, dest: string) => Promise<{ status: number | null }>
   onNote?: (msg: string) => void
   /** 取消信号：用户在界面上点「取消」时中断 pip 引导（否则点了没反应） */
   signal?: AbortSignal
@@ -222,19 +396,74 @@ export async function ensurePip(deps: {
   }
 
   const write = deps.writeFile ?? ((p: string, c: string) => writeFileSync(p, c, 'utf8'))
+  const writeBin = deps.writeBinary ?? ((p: string, b: Buffer) => writeFileSync(p, b))
   // get-pip.py 用 Node https 取：主进程里 fetch 受 CSP/CORS 影响（渲染层同款环境），https 模块不受限
   const fetcher = deps.fetchText ?? ((url: string) => nodeGetText(url))
+  const fetcherBin = deps.fetchBinary ?? ((url: string) => nodeGetBuffer(url))
+  const extractZip =
+    deps.extract ?? ((zip: string, dest: string) => expandArchive(zip, dest, { signal: deps.signal }))
 
   /**
-   * 用 ensurepip 兜底铺 pip（见 looksLikeMissingDistutils 的说明）。
+   * ★ 首选：直接解压 pip wheel 到 site-packages（v1.0.2 新增）。
    *
-   * 为什么放在"get-pip 失败之后"而不是一上来就用它：
-   * ensurepip 自带的 pip 版本**比较旧**（Python 3.12 的 ensurepip 给的是
-   * pip 24.0 左右），而 get-pip.py 会装**当前最新**的 pip。
-   * 优先拿新的，只在它跑不通时才退回旧的。
+   * ## 为什么它是首选而不是 get-pip.py
+   *
+   * pip 本身就是纯 Python 包，wheel 解压进 `Lib/site-packages` 即可用。
+   * 这条路**完全绕开** get-pip / ensurepip / distutils 三个脆弱点：
+   *
+   *   实测（embed Python 3.12.10，同一台机器）：
+   *     get-pip.py（官方）   59,700 ms，且依赖 distutils 可用
+   *     pip wheel 直装        2,368 ms，零依赖 → pip 26.2.1 可用
+   *
+   * ## 为什么先抓索引页再取 wheel
+   *
+   * wheel 直链带 hash 路径（`/packages/f3/6e/…`），写死必失效。
+   * simple 索引 HTML 是 PyPI 标准格式，各镜像一致，正则挑版本最高的即可。
+   */
+  const installPipFromWheel = async (): Promise<boolean> => {
+    const sitePackages = join(deps.dir, 'Lib', 'site-packages')
+    for (const index of PIP_WHEEL_INDEXES) {
+      try {
+        deps.onNote?.(`获取 pip wheel 列表（${new URL(index).host}）`)
+        const html = await fetcher(index)
+        const wheelUrl = pickLatestPipWheel(html, index)
+        if (!wheelUrl) continue
+        deps.onNote?.('下载 pip wheel')
+        const buf = await fetcherBin(wheelUrl)
+        /*
+         * ★ 必须存成 .zip 扩展名。
+         *   wheel 本身就是 zip，但 Windows 的 Expand-Archive **只认 .zip**，
+         *   传 .whl 会直接报「不是支持的存档文件格式」（实测踩过）。
+         */
+        const zipPath = join(deps.dir, 'pip-wheel.zip')
+        writeBin(zipPath, buf)
+        mkdirSync(sitePackages, { recursive: true })
+        const ex = await extractZip(zipPath, sitePackages)
+        if (ex.status !== 0) continue
+        const check = await deps.runPython(['-m', 'pip', '--version'], { signal: deps.signal })
+        if (check.status === 0) return true
+      } catch {
+        /* 这个索引不可用，换下一个 */
+      }
+    }
+    return false
+  }
+
+  /**
+   * 次选：用 ensurepip 铺 pip（见 looksLikeMissingDistutils 的说明）。
+   *
+   * ⚠ **必须先探测**：Windows embed 包不包含 ensurepip
+   *（官方只保留最小运行时，省略了 ensurepip / tkinter / IDLE）。
+   * 直接跑 `-m ensurepip` 必然失败还白等一轮 ——
+   * 实测报 `ModuleNotFoundError: No module named 'ensurepip'`。
    */
   const tryEnsurePip = async (): Promise<boolean> => {
-    deps.onNote?.('改用 ensurepip 铺 pip（embed 版缺 distutils 时的兜底）')
+    const probe = await deps.runPython(['-c', 'import ensurepip'], { signal: deps.signal })
+    if (probe.status !== 0) {
+      deps.onNote?.('此 Python 不带 ensurepip（embed 版特性），跳过该兜底')
+      return false
+    }
+    deps.onNote?.('改用 ensurepip 铺 pip（缺 distutils 时的兜底）')
     const r = await deps.runPython(['-m', 'ensurepip', '--upgrade'], { signal: deps.signal })
     if (r.status !== 0) return false
     /*
@@ -250,6 +479,19 @@ export async function ensurePip(deps: {
   }
 
   let lastErr: unknown
+
+  /* ── 第 1 顺位：pip wheel 直装 ────────────────────────────────────── */
+  try {
+    if (await installPipFromWheel()) {
+      deps.onNote?.('pip 安装完成（wheel 直装）')
+      await ensureBuildTools(deps)
+      return
+    }
+  } catch (e) {
+    lastErr = e
+  }
+
+  /* ── 第 2 顺位：get-pip.py（官方源，国内慢，仅作兜底）────────────── */
   for (const url of GET_PIP_URLS) {
     try {
       deps.onNote?.(`下载 pip 引导脚本（${new URL(url).host}）`)
@@ -259,8 +501,8 @@ export async function ensurePip(deps: {
       const r = await deps.runPython([file, '--no-warn-script-location'], { signal: deps.signal })
       if (r.status !== 0) {
         /*
-         * ★ embed 版缺 distutils 是**可预期的**情况（见函数上方那段），
-         *   不是"源坏了"——所以不要换下一个 get-pip 源重试（会白等一轮超时），
+         * ★ 缺 distutils 是**可预期的**（Python 3.12 已移除该模块），
+         *   不是"源坏了"——所以不要换下一个源重试（会白等一轮超时），
          *   直接走 ensurepip 兜底。
          */
         if (looksLikeMissingDistutils(`${r.stderr ?? ''}${r.stdout ?? ''}`)) {

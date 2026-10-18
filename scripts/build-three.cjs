@@ -63,7 +63,7 @@ const DIST = join(ROOT, 'dist')
  * 改版本号时只改这里（以及下面 PLAN 里的目标版本），
  * 别让它再跟"打包前的临时值"挂钩。
  */
-const PUBLISH_VERSION = '1.0.1'
+const PUBLISH_VERSION = '1.0.2'
 
 /** 打包计划（顺序有意义，见文件头说明） */
 const PLAN = [

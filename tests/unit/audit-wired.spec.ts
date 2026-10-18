@@ -50,6 +50,8 @@ describe('审计日志已接进 IPC 链路', () => {
     writeFileSync(join(rt, 'mxbot-runtime.json'), '{"kind":"pypi","tag":"v4.28.0"}', 'utf8')
     mkdirSync(join(root, 'runtime', 'python'), { recursive: true })
     writeFileSync(join(root, 'runtime', 'python', 'python.exe'), '', 'utf8')
+    /* v1.0.2：实例门槛改判 isPythonUsable（解释器 + pip），所以还要造出 pip */
+    mkdirSync(join(root, 'runtime', 'python', 'Lib', 'site-packages', 'pip'), { recursive: true })
 
     const audit = createAuditLog({ dataRoot: root })
     const h = buildHandlers({

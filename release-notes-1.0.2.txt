@@ -1,0 +1,42 @@
+修复：内置 Python 装不上 pip，导致 AstrBot 实例起不来
+
+【问题现象】
+部分用户装完内置 Python 后：
+· 装 AstrBot 依赖全部失败，日志报 "No module named pip"
+· 创建实例后启动失败，报 "No module named 'click'"
+· 系统信息里 Python 关键包显示 pip=缺 setuptools=缺 wheel=缺
+
+【根因】
+1. 备用源 mirrors.aliyun.com/pypi/get-pip.py 是 2021 年的静态副本，
+   内嵌的 pip 版本低于 21.3，启动时要 import distutils；
+   而 Python 3.12 已按 PEP 632 移除该模块，于是必然报
+   ModuleNotFoundError: No module named 'distutils'。
+   → 官方源一旦超时就会切到它，然后怎么重试都装不上 pip。
+
+2. 兜底方案用 python -m ensurepip，但 Windows embed 版
+   根本不包含 ensurepip（官方精简掉了），所以那一路永远失败。
+
+3. 就绪判据只检查 python.exe 在不在。pip 装失败时 python.exe
+   其实已经解压到位了，于是再次点击"安装 Python"会直接返回成功
+   （假成功），完全跳过 pip 引导。
+
+【修复】
+· 首选改为「pip wheel 直装」：直接下载 pip 的 wheel 解压进
+  Lib/site-packages。完全绕开 get-pip / ensurepip / distutils
+  三个脆弱点。实测 2.4 秒完成（官方 get-pip 要 59.7 秒）。
+· 删除有问题的阿里云 get-pip 源。国内镜像实测都不提供 get-pip.py
+  （腾讯/华为/中科大 404，清华 403），官方源降为兜底。
+· ensurepip 兜底增加前置探测，不存在就直接跳过，不再白等一轮。
+· 就绪判据拆成两个：isPythonReady（解释器）与 isPythonUsable
+  （解释器 + pip）。建实例、装 Python 改用后者，
+  坏掉的 Python 会被自动修好，而不是永远卡在假成功。
+· 顺手修：ipc.ts 里 DownloadProgress 类型名写错（应为
+  DownloadProgressEvent），该错误会让下载进度的类型检查失效。
+
+【验证】
+· 在干净 embed Python 3.12.10 上做了 A/B 对照实验：
+  官方 get-pip 成功装上 pip 26.2.1；阿里云那份必定失败。
+· 新增真机端到端测试，用真实网络走完整流程（下载 wheel →
+  解压 → python -m pip --version），14.5 秒通过。
+· 单元测试 1039 通过 / 3 失败，那 3 条已在 1.0.1 上验证为既有问题，
+  本次改动零回归。
