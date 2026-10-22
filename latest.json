@@ -3,5 +3,26 @@
   "url": "AstriaX-Setup-1.0.2.exe",
   "size": 85959760,
   "sha256": "c46dd9ef057748c267dd19d2e142e96ccd6e5ccf00d1320a6c58209f5e9d60fe",
-  "notes": "修复：装 Python 后 AstrBot 实例起不来、依赖装不上的问题\n\n· 修复装 AstrBot 依赖失败（报 No module named pip）的问题\n· 修复启动实例失败（报 No module named 'click'）的问题\n· Python 下载与安装提速：改用国内镜像，约 2 秒装完 pip（原来要等一分钟）\n· 修复「安装 Python」二次点击显示成功但实际没装完的假成功问题\n· 修复检查更新、下载安装包时可能出现的 404"
+  "notes": "修复：装 Python 后 AstrBot 实例起不来、依赖装不上的问题\n\n· 修复装 AstrBot 依赖失败（报 No module named pip）的问题\n· 修复启动实例失败（报 No module named 'click'）的问题\n· Python 下载与安装提速：改用国内镜像，约 2 秒装完 pip（原来要等一分钟）\n· 修复「安装 Python」二次点击显示成功但实际没装完的假成功问题\n· 修复检查更新、下载安装包时可能出现的 404",
+  "mobileVersion": "1.0.2",
+  "mobileVersionCode": 102,
+  "mobileUrl": "https://github.com/Huan-Yan123/AstriaX/releases/download/v1.0.2/AstriaX-1.0.2.apk",
+  "mobileReleases": [
+    {
+      "version": "1.0.0",
+      "versionCode": 100,
+      "url": "https://github.com/Huan-Yan123/AstriaX/releases/download/v1.0.0/AstriaX-1.0.0.apk"
+    },
+    {
+      "version": "1.0.1",
+      "versionCode": 101,
+      "url": "https://github.com/Huan-Yan123/AstriaX/releases/download/v1.0.1/AstriaX-1.0.1.apk"
+    },
+    {
+      "version": "1.0.2",
+      "versionCode": 102,
+      "url": "https://github.com/Huan-Yan123/AstriaX/releases/download/v1.0.2/AstriaX-1.0.2.apk"
+    }
+  ],
+  "mobileNotes": "1.0.2: 自研 tar 解包（支持 PAX 扩展头，修 apt 报 PaxHeaders 是目录）、通知常驻开关落盘、上下留白收窄、著作声明移除检查更新"
 }
