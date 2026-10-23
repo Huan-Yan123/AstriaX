@@ -2,3 +2,11 @@ allowBuilds:
   better-sqlite3: true
   electron: true
   esbuild: true
+  electron-winstaller: false # 当前只打 NSIS，无需 Squirrel 安装脚本
+
+overrides:
+  source-map-js: 1.2.2
+  brace-expansion@<2: 1.1.21
+  brace-expansion@>=2 <3: 2.1.7
+  brace-expansion@>=4 <6: 5.0.12
+  http-cache-semantics: 4.3.0

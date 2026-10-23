@@ -1,11 +1,18 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
-export default defineConfig({
+// 日常回归无需下载 Python / AstrBot；真实网络和压力测试由显式命令启用。
+const suites: Record<string, string[]> = {
+  integration: ['tests/integration/**/*.spec.ts'],
+  stress: ['tests/stress/**/*.spec.ts'],
+  all: ['tests/**/*.spec.ts']
+}
+
+export default defineConfig(({ mode }) => ({
   plugins: [vue()],
   test: {
     environment: 'happy-dom',
-    include: ['tests/**/*.spec.ts'],
+    include: suites[mode] ?? ['tests/unit/**/*.spec.ts', 'tests/ui/**/*.spec.ts'],
     /*
      * ══════════════════════════════════════════════════════════════════════
      * ★★ 文件之间**串行**执行（主人 2026-10-08：全量跑才偶发的红）
@@ -42,4 +49,4 @@ export default defineConfig({
      */
     fileParallelism: false
   }
-})
+}))

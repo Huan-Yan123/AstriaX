@@ -25,7 +25,8 @@
  */
 import { existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
-import { createHash } from 'crypto'
+import { createHash, randomBytes } from 'crypto'
+import { safeSegment } from '../util/safe-segment'
 
 export interface AppUpdateManifest {
   /** 最新版本号，形如 "0.2.0" */
@@ -325,58 +326,48 @@ export interface DownloadDeps {
  * - 校验（如果清单给了 sha256）在**改名之前**做，不匹配就删掉残file并报错
  */
 export async function downloadAppUpdate(deps: DownloadDeps): Promise<string> {
-  const name = deps.fileName ?? fileNameFromUrl(deps.url)
+  const name = safeSegment(deps.fileName ?? fileNameFromUrl(deps.url), { what: '安装包文件名' })
   mkdirSync(deps.dir, { recursive: true })
   const outPath = join(deps.dir, name)
-  const partPath = `${outPath}.part`
+  const partPath = `${outPath}.${randomBytes(8).toString('hex')}.part`
 
   if (existsSync(outPath) && deps.overwrite === false) return outPath
 
-  // 上次中断可能留下 .part，先清掉
   try {
-    if (existsSync(partPath)) unlinkSync(partPath)
-  } catch {
-    /* 删不掉也继续，下面的写入会覆盖 */
-  }
+    const got = await deps.fetchToFile(deps.url, partPath, (g, t) => {
+      const percent = t && t > 0 ? Math.min(100, Math.round((g / t) * 100)) : 0
+      deps.onProgress?.({ percent, got: g, total: t })
+    })
 
-  const got = await deps.fetchToFile(deps.url, partPath, (g, t) => {
-    const percent = t && t > 0 ? Math.min(100, Math.round((g / t) * 100)) : 0
-    deps.onProgress?.({ percent, got: g, total: t })
-  })
+    if (deps.expectSha256) {
+      const actual = await sha256OfFile(partPath)
+      if (actual.toLowerCase() !== deps.expectSha256.toLowerCase()) {
+        try {
+          unlinkSync(partPath)
+        } catch {
+          /* 清理失败不影响报错 */
+        }
+        throw new Error(`安装包校验失败：SHA256 不匹配（期望 ${deps.expectSha256.slice(0, 12)}…，实际 ${actual.slice(0, 12)}…）`)
+      }
+    }
 
-  if (deps.expectSha256) {
-    const actual = await sha256OfFile(partPath)
-    if (actual.toLowerCase() !== deps.expectSha256.toLowerCase()) {
+    // 空响应不能替换已有安装包。
+    if (got <= 0) {
       try {
         unlinkSync(partPath)
       } catch {
-        /* 清理失败不影响报错 */
+        /* ignore */
       }
-      throw new Error(`安装包校验失败：SHA256 不匹配（期望 ${deps.expectSha256.slice(0, 12)}…，实际 ${actual.slice(0, 12)}…）`)
+      throw new Error('下载失败：收到 0 字节')
     }
-  }
 
-  // 大小对不上也当失败（服务器传了个坏文件 / 中途被截断）
-  if (got <= 0) {
-    try {
-      unlinkSync(partPath)
-    } catch {
-      /* ignore */
-    }
-    throw new Error('下载失败：收到 0 字节')
+    // 改名上位（同目录 rename 是原子的）
+    const { renameSync } = await import('fs')
+    renameSync(partPath, outPath)
+    return outPath
+  } finally {
+    try { if (existsSync(partPath)) unlinkSync(partPath) } catch { /* 保留原始下载异常 */ }
   }
-
-  // 改名上位（同目录 rename 是原子的）
-  const { renameSync } = await import('fs')
-  if (existsSync(outPath)) {
-    try {
-      unlinkSync(outPath)
-    } catch {
-      /* 覆盖不了就让 rename 报错，别静默 */
-    }
-  }
-  renameSync(partPath, outPath)
-  return outPath
 }
 
 async function sha256OfFile(path: string): Promise<string> {

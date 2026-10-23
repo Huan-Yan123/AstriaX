@@ -2,7 +2,9 @@
  * 窗口管理模块
  * 负责主窗口的创建、配置和生命周期
  */
-import { BrowserWindow, nativeImage } from 'electron'
+import { BrowserWindow, nativeImage, app, shell } from 'electron'
+import { pathToFileURL } from 'url'
+import { configureLauncherSecurity } from '../security/renderer'
 import { join, dirname } from 'path'
 import { existsSync } from 'fs'
 
@@ -59,24 +61,17 @@ export function createMainWindow(preloadPath: string): BrowserWindow {
     }
   })
 
-  // 开发模式加载 vite 开发服务器
-  if (process.env.ELECTRON_RENDERER_URL) {
-    win.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  const rendererUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
+    ? process.env.ELECTRON_RENDERER_URL
+    : pathToFileURL(join(__dirname, '../renderer/index.html')).href
+  configureLauncherSecurity(win.webContents, rendererUrl, (url) => shell.openExternal(url))
+  void win.loadURL(rendererUrl)
 
   // 窗口准备好后显示
   win.once('ready-to-show', () => {
     win.show()
   })
 
-  // 禁止导航到外部 URL（安全加固）
-  win.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith('file://') && !url.startsWith('http://localhost')) {
-      event.preventDefault()
-    }
-  })
 
   return win
 }

@@ -1,0 +1,25 @@
+{
+  "groups": {
+    "packaging": [
+      "build/icon.png",
+      "build/installer.nsh"
+    ],
+    "renderer": [
+      "src/renderer/src/assets/astriax-logo.png",
+      "src/renderer/src/assets/mascot-corner.png",
+      "src/renderer/src/assets/mascot-download.png",
+      "src/renderer/src/assets/mascot-instance-empty.png",
+      "src/renderer/src/assets/mascot-runtime-missing.png",
+      "src/renderer/src/assets/mascot-settings.png",
+      "src/renderer/src/assets/mascot-run-sprite.webp",
+      "src/renderer/src/assets/mascot-run-sprite-aligned.webp"
+    ],
+    "design-reference": [
+      "docs/design/astriax-character-reference/README.md",
+      "docs/design/astriax-character-reference/front.png",
+      "docs/design/astriax-character-reference/side.png",
+      "docs/design/astriax-character-reference/back.png",
+      "docs/design/astriax-character-reference/emotion-download-transparent.png"
+    ]
+  }
+}

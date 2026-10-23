@@ -145,8 +145,8 @@ if (want('selfcheck')) {
 if (want('tests')) {
   steps.push({
     name: 'tests',
-    label: '全量单元/界面测试（vitest --no-file-parallelism）',
-    run: () => run('tests', 'npx', ['vitest', 'run', '--no-file-parallelism']),
+    label: '全量测试（含压力/集成，vitest --mode all）',
+    run: () => run('tests', 'npx', ['vitest', 'run', '--mode', 'all', '--no-file-parallelism']),
     check: (r) => {
       if (r.timedOut) return '测试超时'
       /*

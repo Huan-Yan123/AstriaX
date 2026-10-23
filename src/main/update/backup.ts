@@ -4,13 +4,10 @@
 // 备份路径（backupRuntime）已全部改成 fsp 异步 —— 那个才是会遍历上万文件的热点。
 import {
   existsSync,
-  mkdirSync,
   readFileSync,
-  writeFileSync,
   renameSync,
   readdirSync,
-  unlinkSync,
-  rmSync
+  unlinkSync
 } from 'fs'
 import { promises as fsp } from 'fs'
 import { dirname, join, relative, resolve, sep } from 'path'
@@ -68,8 +65,8 @@ async function collectFileEntriesAsync(
     let entries
     try {
       entries = await fsp.readdir(dir, { withFileTypes: true })
-    } catch {
-      return // 读不到就当空目录（权限/被删），不影响其他文件
+    } catch (error) {
+      throw new Error(`读取备份目录失败：${dir}：${String(error)}`)
     }
     for (const name of entries) {
       const p = join(dir, name.name)
@@ -85,8 +82,8 @@ async function collectFileEntriesAsync(
           const data = await fsp.readFile(p)
           await onFile(relative(base, p), data)
           count++
-        } catch {
-          /* 单个文件读不到就跳过，别让整个备份失败 */
+        } catch (error) {
+          throw new Error(`读取备份文件失败：${p}：${String(error)}`)
         }
       }
     }
@@ -167,6 +164,10 @@ export async function backupRuntime(deps: BackupDeps): Promise<BackupResult> {
   const scopes = [...new Set(entries.map((e) => e.rel.split(/[\\/]/)[0]))].filter(
     (s) => s !== MANIFEST_NAME
   )
+  // 空目录同样属于快照，否则恢复空库时会保留之后新增的数据。
+  for (const sub of DATA_DIRS) {
+    if (existsSync(join(deps.dir, sub)) && !scopes.includes(sub)) scopes.push(sub)
+  }
 
   /*
    * ## manifest 必须**嵌在归档里**，作为第一个条目
@@ -306,9 +307,15 @@ export async function backupRuntime(deps: BackupDeps): Promise<BackupResult> {
  * 用 resolve 而不是字符串前缀比较 —— 前缀比较挡不住 `..`。
  */
 function safeRelOrThrow(rel: string, base: string): string {
+  const parts = rel.replace(/\\/g, '/').split('/')
+  if (parts.some((part) => !part || part === '.' || part === '..' ||
+      /[<>:"|?*\x00-\x1f]/.test(part) || /[. ]$/.test(part) ||
+      /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part))) {
+    throw new Error(`备份里的路径不合法，已拒绝：${rel}`)
+  }
   const target = resolve(base, rel)
   const nb = resolve(base)
-  if (target !== nb && !target.toLowerCase().startsWith(nb.toLowerCase() + sep)) {
+  if (target === nb || !target.toLowerCase().startsWith(nb.toLowerCase() + sep)) {
     throw new Error(`备份里的路径指向实例目录外面，已拒绝：${rel}`)
   }
   return target
@@ -519,99 +526,78 @@ export async function restoreBackup(deps: {
    * 旧数据已经被挪成 .deleted-* 却没能还原，用户拿到的状态比回滚前更糟。
    */
   const targets = payloadEntries.map((e) => ({ e, target: safeRelOrThrow(e.rel, base) }))
+  const seen = new Set<string>()
+  for (const { e } of targets) {
+    const normalized = e.rel.replace(/\\/g, '/').toLowerCase()
+    if (seen.has(normalized)) throw new Error('备份包含重复路径：' + e.rel)
+    seen.add(normalized)
+    if (!isLegacy && DATA_FILES.includes(e.rel.split(/[\\/]/)[0]) && /[\\/]/.test(e.rel)) {
+      throw new Error('备份中的元数据文件不能作为目录：' + e.rel)
+    }
+  }
+  const tops = new Set(payloadEntries.map((e) => e.rel.split(/[\\/]/)[0]))
+  if (!isLegacy) {
+    if (manifest?.scopes !== undefined && (!Array.isArray(manifest.scopes) ||
+        manifest.scopes.some((scope) => typeof scope !== 'string'))) {
+      throw new Error('备份里的恢复范围不合法')
+    }
+    for (const scope of manifest?.scopes ?? []) tops.add(scope)
+    const allowed = new Set([...DATA_DIRS, ...DATA_FILES])
+    for (const top of tops) {
+      if (!allowed.has(top)) throw new Error('备份包含非实例数据范围：' + top)
+    }
+  }
+  for (const top of tops) safeRelOrThrow(top, base)
 
-  // 先把即将被覆盖的顶层项挪到 .deleted-*，失败也不至于新旧混在一起
-  const tops = new Set(payloadEntries.map((e) => e.rel.split(/[\\/]/)[0]).filter(Boolean))
+  // 先在同盘暂存区写完整快照，磁盘满或文件名错误都不改变当前数据。
+  await fsp.mkdir(deps.dir, { recursive: true })
+  const stage = await fsp.mkdtemp(join(deps.dir, '.restore-stage-'))
   const moved: Array<{ from: string; to: string }> = []
-  for (const top of tops) {
-    const p = join(base, top)
-    if (existsSync(p)) {
-      /*
-       * ★ 名字加随机后缀（独立复核抓出的一致性缺口）
-       *
-       * 原来只有裸 `Date.now()`，与本项目其它临时名（`updater.ts` 的
-       * `.deleted-`、`runtime-store.ts` 的 `.deleting-`）的约定不一致。
-       *
-       * 碰撞后果是**真实**的：上面那几条注释明确说"失败时保留
-       * `.deleted-*` 残骸"—— 那么上次失败留下的残骸如果恰好和这次
-       * 生成的同名（同一毫秒且同一顶层项，或时钟回拨），
-       * `renameSync` 在 Windows 上会因目标已存在而抛错，
-       * 而这一行**没有 try/catch**，异常直接冒泡。
-       *
-       * 好在它发生在覆盖写入**之前**（用户数据还没被动过），所以
-       * 不会损坏数据；但报错是裸的 EPERM/EEXIST，看不出原因。
-       * 加后缀让碰撞不可能发生。
-       */
-      const to = `${p}.deleted-${Date.now()}-${randomBytes(4).toString('hex')}`
-      renameSync(p, to)
-      moved.push({ from: p, to })
-    }
-  }
-
-  /*
-   * 写盘失败时**保留** .deleted-* 残骸。
-   *
-   * 那不是垃圾，是用户唯一的还原点：新内容没写成功，
-   * 旧数据还在那个被挪走的目录里。清掉它等于把用户的数据删了。
-   * 成功才清（见下面）。
-   */
+  const installed: string[] = []
   try {
-    for (const { e, target } of targets) {
-      mkdirSync(dirname(target), { recursive: true })
-      writeFileSync(target, e.data)
+    for (const { e } of targets) {
+      const target = safeRelOrThrow(e.rel, stage)
+      await fsp.mkdir(dirname(target), { recursive: true })
+      await fsp.writeFile(target, e.data)
     }
-  } catch (err) {
-    throw new Error(
-      `回滚写入失败（旧数据已保留在 .deleted-* 目录里，可手工还原）：${
-        err instanceof Error ? err.message : String(err)
-      }`
-    )
-  }
-
-  /*
-   * 成功了才清理残骸。
-   *
-   * 踩过的坑：原来挪走之后从来不删，每回滚一次就在实例目录下多留一份
-   * 完整旧数据（AstrBot 的 data\ 几百 MB），回滚几次就把盘吃出大坑，
-   * 而界面上完全看不出来 —— 那些目录不在任何列表里。
-   *
-   * ## ★ 清理改成异步（指导书 P0-4）
-   *
-   * 这些残骸是**几百 MB、几万个文件**的目录，`rmSync` 递归删除会把
-   * 主进程事件循环整段堵死（用户观感：回滚完"卡死"好几秒）。
-   * 清理本身是**尽力而为**的收尾工作（删不掉也只是留点垃圾，
-   * 不影响回滚结果），所以完全不必同步等它 —— 交给异步删、
-   * 失败只记一行日志。
-   */
-  /*
-   * ★ 清理残骸：**异步删、但要 await**（指导书 P0-4 + 数据安全两头都要）
-   *
-   * 演进过程（值得留档，因为我第一版就做错了）：
-   *   ① 原来 `rmSync(m.to, {recursive:true})` —— 同步递归删几百 MB/几万文件，
-   *      主进程事件循环整段冻死（用户观感："回滚完卡死好几秒"）
-   *   ② 我改成 `void removeDirAsync(...)`（fire-and-forget）—— 不冻了，
-   *      但**破坏了"回滚返回时残骸已清理"的契约**（两条测试立刻红），
-   *      而且进程紧接着退出就会永久留下几百 MB 垃圾
-   *   ③ 现在：本函数变 async，**await** 异步删除 ——
-   *      既不在事件循环里同步等待（removeDirAsync 走线程池），
-   *      又保证调用方拿到的"回滚完成"是真的完成（含清理）
-   *
-   * 调用方（ipc.ts 的 backup:restore）本来就是异步 handler，await 它即可。
-   */
-  for (const m of moved) {
+    if (!isLegacy) {
+      for (const top of tops) {
+        if (DATA_DIRS.includes(top)) await fsp.mkdir(join(stage, top), { recursive: true })
+        else if (!existsSync(join(stage, top))) throw new Error('备份缺少声明的数据文件：' + top)
+      }
+    }
+    await fsp.mkdir(base, { recursive: true })
     try {
-      await removeDirAsync(m.to)
-    } catch (e) {
-      /*
-       * 删不掉不该让回滚算失败（数据已经回来了），但要**如实记一笔** ——
-       * 静默失败会让用户"盘越来越小却查不出原因"。
-       * 日志经可选注入（这个模块本身没有 logger），由 ipc.ts 接到统一日志。
-       */
-      deps.log?.(
-        `回滚后的旧数据残骸没删掉（不影响回滚结果，只是占空间）：${m.to}`,
-        e instanceof Error ? e.message : String(e)
-      )
+      for (const top of tops) {
+        const current = safeRelOrThrow(top, base)
+        if (existsSync(current)) {
+          const saved = current + '.deleted-' + Date.now() + '-' + randomBytes(4).toString('hex')
+          renameSync(current, saved)
+          moved.push({ from: current, to: saved })
+        }
+        renameSync(join(stage, top), current)
+        installed.push(current)
+      }
+    } catch (error) {
+      const recoveryErrors: string[] = []
+      for (const current of installed.reverse()) {
+        try { await fsp.rm(current, { recursive: true, force: true }) }
+        catch (recoveryError) { recoveryErrors.push(String(recoveryError)) }
+      }
+      for (const saved of [...moved].reverse()) {
+        try { renameSync(saved.to, saved.from) }
+        catch (recoveryError) { recoveryErrors.push(saved.to + '：' + String(recoveryError)) }
+      }
+      throw new Error('回滚替换失败，' + (recoveryErrors.length
+        ? '部分旧数据保留在 .deleted-*，恢复异常：' + recoveryErrors.join('；')
+        : '已自动恢复操作前的数据') + '：' + String(error))
     }
+    for (const saved of moved) {
+      try { await removeDirAsync(saved.to) }
+      catch (error) { deps.log?.('回滚后的旧数据残骸没删掉：' + saved.to, String(error)) }
+    }
+  } finally {
+    await removeDirAsync(stage).catch((error) => deps.log?.('恢复暂存目录清理失败：' + stage, String(error)))
   }
 }
 

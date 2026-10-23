@@ -24,6 +24,7 @@ import { readFile as readFileAsync, readdir as readdirAsync, unlink } from 'fs/p
 import { basename, dirname, join, resolve, sep } from 'path'
 
 import { randomBytes } from 'crypto'
+import { assertTrustedIpcSender } from './security/renderer'
 
 import * as os from 'os'
 import {
@@ -2986,7 +2987,7 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
       const inside = nFolder === nBase || nFolder.startsWith(nBase + sep)
       if (!inside) throw new Error('不允许打开这个路径')
       mkdirSync(nFolder, { recursive: true })
-      const err = await opts.openPath(nFolder)
+      const err = await openPath(nFolder)
       if (err) throw new Error(`打不开文件夹：${err}`)
       opts.logger?.log('INFO', 'backup', `打开备份文件夹 ${nFolder}`)
     },
@@ -5562,7 +5563,8 @@ export async function registerIpcHandlersReal(extra: {
  * ★ IPC 延迟埋点（指导书 0.1.3 自检 2 的产品化） 主人的实测：点任何东西都卡一下、下载页要等全部加载完。 有了这个埋点，"卡在哪个 channel" 从猜测变成**日志里的一行数字**： · >200ms → WARN（用户能感知，值得看） · >1000ms → ERROR（明确的病灶） 异步 handler 的耗时差异（例如等网络 10s）也会如实记录 —— 那不阻塞主进程，但它是"下载页要等半天"的另一半答案。
  */
 
-    ipcMain.handle(ch, async (_e, ...args: unknown[]) => {
+    ipcMain.handle(ch, async (event, ...args: unknown[]) => {
+      assertTrustedIpcSender(event)
       const t0 = Date.now()
       /**
  * ★ 记账：谁在跑、刚跑完什么（主人 2026-09-27 死机日志逼出来的） 他的日志里有这么一段： [ERROR] [perf] IPC window:minimize 耗时 5970ms（严重） [WARN] [perf] 主进程事件循环疑似被同步代码阻塞：… 5941ms … 然后**电脑死机**。问题是：我们知道"卡了 6 秒"， 却**完全不知道那 6 秒主进程在干什么* —— 原始看门狗自己都承认 "阻塞发生瞬间的栈拿不到"。 所以这里维护一份极廉价的记账： · inflight —— 此刻正在执行的 IPC 名（可能不止一个：await 会交错） · recent —— 最近完成的若干个（带耗时），环形保留 阻塞看门狗在检测到卡顿时读它，就能把日志从 "卡了 6 秒" 升级成 "卡了 6 秒，当时在跑 X，刚跑完 Y(1200ms)"。 开销：两个 Map/数组的增删，纳秒级，绝不能因此引入新的阻塞。

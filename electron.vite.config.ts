@@ -1,7 +1,6 @@
 import { resolve } from 'path'
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
+import { defineConfig } from 'electron-vite'
 import vue from '@vitejs/plugin-vue'
-// @ts-expect-error 根目录的构建开关（纯常量文件，没有类型声明）
 import { INTERNAL_BUILD } from './build-flags'
 
 /*
@@ -26,7 +25,7 @@ import { INTERNAL_BUILD } from './build-flags'
  * 公开版的 `false` 让压缩器把整段删掉（已验证：产物里搜不到
  * "9950X3D2" 这些字符串）。
  */
-const INTERNAL = INTERNAL_BUILD === true
+const INTERNAL = Boolean(INTERNAL_BUILD)
 
 /* 构建时明确说出来 —— 免得又出现"以为打了内部版其实没有" */
 console.log(
@@ -37,7 +36,6 @@ console.log(
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin()],
     define: {
       INTERNAL_HW_OVERRIDE: JSON.stringify(INTERNAL)
     },
@@ -48,7 +46,6 @@ export default defineConfig({
     }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()],
     define: {
       INTERNAL_HW_OVERRIDE: JSON.stringify(INTERNAL)
     },

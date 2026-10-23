@@ -1195,6 +1195,10 @@ Var /GLOBAL mxRestoreFailed
    * 这是"用扩展点"的代价，也是它唯一的坑。
    */
   !macro customCheckAppRunning
+    ; electron-builder 26 的 FIND_PROCESS 依赖此初始化；25 的模板没有该宏。
+    !ifmacrodef IS_POWERSHELL_AVAILABLE
+      !insertmacro IS_POWERSHELL_AVAILABLE
+    !endif
     DetailPrint "AstriaX 正在运行，先请它正常退出…"
 
     /* ① 温和：请主进程自己走退出流程（killAll 停实例、endRun 清运行锁） */

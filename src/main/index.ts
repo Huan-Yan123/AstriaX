@@ -2,6 +2,8 @@ import { app, BrowserWindow, dialog, shell } from 'electron'
 import { dirname, join } from 'path'
 import { readFileSync, existsSync } from 'fs'
 import { spawnSync } from 'child_process'
+import { pathToFileURL } from 'url'
+import { configureLauncherSecurity, assertTrustedIpcSender } from './security/renderer'
 /* 联系方式：原生错误框也要带（主人 2026-09-27 指出的遗漏） */
 import { FEEDBACK_LINES } from './feedback'
 /*
@@ -346,14 +348,18 @@ function createWindow(): BrowserWindow {
     icon: winIcon(),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      nodeIntegration: false,
+      contextIsolation: true,
+      webviewTag: false
     }
   })
 
-  win.webContents.setWindowOpenHandler((details) => {
-    void shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
+  const rendererUrl = !app.isPackaged && process.env.ELECTRON_RENDERER_URL
+    ? process.env.ELECTRON_RENDERER_URL
+    : pathToFileURL(join(__dirname, '../renderer/index.html')).href
+  configureLauncherSecurity(win.webContents, rendererUrl, (url) => shell.openExternal(url),
+    (error) => bootLogger?.log('WARN', 'app', '外部链接打开失败', String(error)))
 
   win.webContents.on('render-process-gone', (_e, details) => {
     crash?.(new Error(`渲染进程消失：${details.reason}`), 'renderer-gone')
@@ -391,11 +397,7 @@ function createWindow(): BrowserWindow {
     }
   })
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    void win.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+  void win.loadURL(rendererUrl)
   return win
 }
 
@@ -521,24 +523,6 @@ app.whenReady().then(async () => {
    */
   const boot = await registerIpcHandlersReal({ elevateVerdict })
   
-  // 窗口控制 IPC 处理器
-  const mainWindow = BrowserWindow.getAllWindows()[0]
-  
-  if (mainWindow) {
-    ipcMain.handle('window:minimize', () => mainWindow.minimize())
-    ipcMain.handle('window:toggleMaximize', () => {
-      if (mainWindow.isMaximized()) {
-        mainWindow.unmaximize()
-      } else {
-        mainWindow.maximize()
-      }
-    })
-    ipcMain.handle('window:close', () => mainWindow.close())
-    ipcMain.handle('window:isMaximized', () => mainWindow.isMaximized())
-    
-    mainWindow.on('maximize', () => mainWindow.webContents.send('window:maximize-change', true))
-    mainWindow.on('unmaximize', () => mainWindow.webContents.send('window:maximize-change', false))
-  }
   /*
    * bootLogger：给下面"启动失败"的 catch 用。
    * logger 是 boot 的返回值，catch 作用域里访问不到 —— 而启动失败时
@@ -830,7 +814,8 @@ app.whenReady().then(async () => {
   })
   // 渲染层对「关闭方式」问询的应答
   const { ipcMain } = await import('electron')
-  ipcMain.on('close:answer', (_e, v: unknown) => {
+  ipcMain.on('close:answer', (event, v: unknown) => {
+    try { assertTrustedIpcSender(event) } catch { return }
     resolveCloseAsk(v === 'quit' ? 'quit' : 'tray')
   })
   logger.log('INFO', 'app', '软件启动')
@@ -868,16 +853,17 @@ app.whenReady().then(async () => {
       ipcMain.removeHandler('window:close')
       ipcMain.removeHandler('window:isMaximized')
       
-      ipcMain.handle('window:minimize', () => win.minimize())
-      ipcMain.handle('window:toggleMaximize', () => {
+      ipcMain.handle('window:minimize', (event) => { assertTrustedIpcSender(event); win.minimize() })
+      ipcMain.handle('window:toggleMaximize', (event) => {
+        assertTrustedIpcSender(event)
         if (win.isMaximized()) {
           win.unmaximize()
         } else {
           win.maximize()
         }
       })
-      ipcMain.handle('window:close', () => win.close())
-      ipcMain.handle('window:isMaximized', () => win.isMaximized())
+      ipcMain.handle('window:close', (event) => { assertTrustedIpcSender(event); win.close() })
+      ipcMain.handle('window:isMaximized', (event) => { assertTrustedIpcSender(event); return win.isMaximized() })
       
       win.on('maximize', () => win.webContents.send('window:maximize-change', true))
       win.on('unmaximize', () => win.webContents.send('window:maximize-change', false))

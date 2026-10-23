@@ -115,6 +115,9 @@ export function safeSegment(raw: unknown, opts: SafeSegmentOptions = {}): string
     throw new Error(`${what}不能以点号开头：${t}`)
   }
 
+  if (t.endsWith('.') || /^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(t)) {
+    throw new Error(`${what}不能使用 Windows 保留名称或以点号结尾：${t}`)
+  }
   return t
 }
 

@@ -528,6 +528,9 @@ export async function importArchive(deps: {
       }
     }
 
+    if (!looksLikeRuntimeRoot(srcDir, deps.type)) {
+      throw new Error('解压结果不完整，没有找到运行时文件；请重新下载完整压缩包后导入')
+    }
     mkdirSync(deps.destDir, { recursive: true })
     /*
      * 搬运时**必须跳过中转文件**。

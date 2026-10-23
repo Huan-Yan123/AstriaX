@@ -13,7 +13,12 @@
  * 这里就把这两半都钉住 —— 尤其是"失败必须回落"，
  * 因为那正是"接了新库之后用户反而更常失败"的典型翻车方式。
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+
+vi.mock('../../src/main/update/app-update', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/main/update/app-update')>(),
+  pickFastestSource: vi.fn(async () => undefined)
+}))
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { buildHandlers } from '../../src/main/ipc'

@@ -14,7 +14,13 @@
  *   → 所以这里的实现**只下载、不自动运行安装包**，也不自替换 exe。
  *     下面有专门的测试钉死这一点（绝不能把下载完的文件 exec 起来）。
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// handler 的落盘契约不依赖线上测速；真实选源在独立用例中验证。
+vi.mock('../../src/main/update/app-update', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../src/main/update/app-update')>(),
+  pickFastestSource: vi.fn(async () => undefined)
+}))
 import { writeFileSync, readFileSync, existsSync, rmSync } from 'fs'
 import { join } from 'path'
 import { createHash } from 'crypto'

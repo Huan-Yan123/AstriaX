@@ -1,4 +1,10 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { rmSync } from 'fs'
+import { testStage } from '../helpers/stage'
+
+let dataRoot: string
+beforeEach(() => { dataRoot = testStage('close-policy-') })
+afterEach(() => { rmSync(dataRoot, { recursive: true, force: true }) })
 
 /*
  * tray.ts 顶部直接 `import { nativeImage } from 'electron'`（loadIconImage 用它
@@ -169,21 +175,21 @@ describe('closePolicy（关闭行为：首次询问一次，之后按记住的�
      * （哪怕只是端口）都会被填成 'tray'，关闭流程就再也看不到 undefined，
      * 「问一次」的分支变成死代码 —— 看起来实现了，其实从不触发。
      */
-    await h['config:set']({ dataRoot: 'E:\\somewhere' })
+    await h['config:set']({ dataRoot })
     const cfg = (await h['config:get']()) as { closePolicy?: string }
     expect(cfg.closePolicy, '必须保持 undefined，等用户自己选一次').toBeUndefined()
   })
 
   it('用户选过之后才有 closePolicy', async () => {
     const h = buildHandlers({ probe: stubProbe, processManager: createProcessManager() })
-    await h['config:set']({ dataRoot: 'E:\\somewhere' })
+    await h['config:set']({ dataRoot })
     await h['config:set']({ closePolicy: 'tray' })
     expect(((await h['config:get']()) as { closePolicy?: string }).closePolicy).toBe('tray')
   })
 
   it('用户改成 quit 后能持久化，后续仍可改回 tray', async () => {
     const h = buildHandlers({ probe: stubProbe, processManager: createProcessManager() })
-    await h['config:set']({ dataRoot: 'E:\\somewhere', closePolicy: 'quit' })
+    await h['config:set']({ dataRoot, closePolicy: 'quit' })
     expect(((await h['config:get']()) as { closePolicy: string }).closePolicy).toBe('quit')
     await h['config:set']({ closePolicy: 'tray' })
     expect(((await h['config:get']()) as { closePolicy: string }).closePolicy).toBe('tray')

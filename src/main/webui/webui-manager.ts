@@ -1,4 +1,5 @@
 import type { BrowserWindow } from 'electron'
+import { httpExternalUrl } from '../security/renderer'
 
 export interface ViewHandle {
   loadURL: (url: string) => Promise<void>
@@ -239,11 +240,18 @@ export function createElectronWebUi(win: BrowserWindow, onEscape?: () => void) {
   // eslint 侧允许 TypeScript 的 createRequire 方案
   const { createRequire } = require('module') as { createRequire: (p: string) => NodeRequire }
   const nodeRequire = createRequire(__filename)
-  const { WebContentsView } = nodeRequire('electron') as typeof import('electron')
+  const { WebContentsView, shell } = nodeRequire('electron') as typeof import('electron')
 
   return {
     createView: (url: string): ViewHandle => {
-      const view = new WebContentsView()
+      const view = new WebContentsView({ webPreferences: {
+        nodeIntegration: false, contextIsolation: true, sandbox: true
+      } })
+      view.webContents.setWindowOpenHandler(({ url: target }) => {
+        const external = httpExternalUrl(target)
+        if (external) void shell.openExternal(external).catch(() => undefined)
+        return { action: 'deny' }
+      })
       win.contentView.addChildView(view)
       // 逃生通道：WebUI 页面本身可能白屏/卡死，界面上的按钮也可能被盖住，
       // 所以直接在这个视图里挂快捷键——Esc 或 Ctrl+W 一定能把视图关掉。

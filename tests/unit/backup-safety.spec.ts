@@ -129,20 +129,12 @@ describe('备份回滚的安全', () => {
     expect(readFileSync(join(inst, 'data', 'db.sqlite'), 'utf8')).toBe('v1')
   })
 
-  it('★回滚失败时残骸要留着（那是用户唯一的还原点）', async () => {
+  it('★非法文件名在写盘前拒绝，当前数据保持可用', async () => {
     const inst = join(root, 'inst')
     mkdirSync(join(inst, 'data'), { recursive: true })
     writeFileSync(join(inst, 'data', 'db.sqlite'), 'keep-me', 'utf8')
 
-    /*
-     * 要测的是「**解析成功、写盘阶段**失败」时旧数据有没有保住。
-     * 所以不能用一个头部就坏掉的归档 —— 那种在挪走旧数据之前就抛了，
-     * 残骸为 0 是正常的（什么都没动，也就没什么要保的）。
-     *
-     * 这里用 Windows 文件名里非法的 `<`（实测必然 ENOENT）：
-     * 解析全程正常、旧数据已经挪走，然后这一条写盘失败 ——
-     * 正好落在我们要守的那个阶段。
-     */
+    // 结构合法但文件名非法的归档，也必须在接触当前数据前被拒绝。
     const tricky = join(inst, 'backups')
     mkdirSync(tricky, { recursive: true })
     const bad = join(tricky, 'write-fail.tar.gz')
@@ -161,13 +153,7 @@ describe('备份回滚的安全', () => {
 
     await expect(restoreBackup({ dir: inst, file: bad })).rejects.toThrow()
     const leftovers = readdirSync(inst).filter((f) => f.includes('.deleted-'))
-    expect(
-      leftovers.length,
-      '回滚失败时旧数据必须留在 .deleted-* 里，否则用户唯一的还原点也没了'
-    ).toBeGreaterThan(0)
-    // 而且旧数据**真的还在**（不是只留了个空壳目录）
-    const kept = leftovers.find((f) => f.startsWith('data.deleted-'))
-    expect(kept, '被挪走的应该是整个 data\\').toBeTruthy()
-    expect(readFileSync(join(inst, kept!, 'db.sqlite'), 'utf8')).toBe('keep-me')
+    expect(leftovers, '校验失败不应移动当前数据').toEqual([])
+    expect(readFileSync(join(inst, 'data', 'db.sqlite'), 'utf8')).toBe('keep-me')
   })
 })

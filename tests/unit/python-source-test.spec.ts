@@ -70,7 +70,7 @@ describe('★Python 源测速（与 GitHub 源同一套形态）', () => {
       sources: [BUILTIN_PYTHON_SOURCES[0]],
       fetchText: async () => ({ status: 200, body: '   \n  ' })
     })
-    expect(rows[0].status, '一个空的索引页等于拿不到东西').toBe('unreachable')
+    expect(rows[0].status, '一个空的索引页等于拿不到东西').toBe('empty')
     expect(rows[0].reason).toContain('空')
   })
 

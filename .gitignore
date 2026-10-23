@@ -1,17 +1,41 @@
 node_modules/
-out/
-dist/
+/out/
+/dist/
 *.log
 .DS_Store
-data/
-templates/
-release/
+/data/
+/templates/
+/release/
 # 编辑器写入残留的原子临时目录
 **/.*.tmpdir/
 *.tmp
-data-test/
+/data-test/
 # 临时目录：里面是测试用的 Python 环境（含 100MB+ 的 DLL），不进仓库
-tmp/
+/tmp/
 # 改动前的本地备份（主人要求"先备份再改"时生成的），属于工作过程
 # 产物、不是源码 —— 它们只是同一批文件的历史副本，进仓库是纯噪音
-backup/
+/backup/
+
+# 本地配置、工具缓存与测试产物
+.env
+.env.*
+!.env.example
+.pnpm-store/
+.cache/
+coverage/
+test-results/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+
+# 本地构建后手动上传 Release 资产，产物不混入源码仓库
+/.github/workflows/
+/*.exe
+/*.exe.blockmap
+/latest.yml
+*.pfx
+*.p12

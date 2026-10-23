@@ -7,9 +7,10 @@
     "jsx": "preserve",
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "types": ["node", "vite/client", "electron-vite/node"],
     "baseUrl": ".",
     "paths": { "@main/*": ["src/main/*"], "@renderer/*": ["src/renderer/src/*"] },
     "noEmit": true
   },
-  "include": ["src", "tests", "electron.vite.config.ts"]
+  "include": ["src", "tests", "electron.vite.config.ts", "vitest.config.ts", "build-flags.ts"]
 }

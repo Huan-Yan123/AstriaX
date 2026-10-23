@@ -39,14 +39,12 @@ describe('工作目录：所有临时与缓存都落在 data 下，绝不碰 C �
     expect(env.TEMP!.startsWith(root)).toBe(true)
   })
 
-  it('真实安装目录（E 盘那种）下算出来的路径也不含 AppData', () => {
-    // 用主人实际的安装位置验证一遍：data 在 E 盘，缓存也必须跟着在 E 盘
-    const eRoot = 'E:\\MX\\launcher-acb\\data'
-    const env = pipEnvFor(eRoot)
-    expect(env.PIP_CACHE_DIR).toBe('E:\\MX\\launcher-acb\\data\\cache\\pip-cache')
-    expect(env.TEMP).toBe('E:\\MX\\launcher-acb\\data\\cache\\tmp')
-    expect(env.PIP_CACHE_DIR).not.toContain('AppData')
-    expect(env.TEMP).not.toContain('AppData')
+  it('自定义安装目录下的缓存仍跟着数据根，不落回系统临时目录', () => {
+    const customRoot = join(root, '自定义安装位置', 'data')
+    const env = pipEnvFor(customRoot)
+    expect(env.PIP_CACHE_DIR).toBe(join(customRoot, 'cache', 'pip-cache'))
+    expect(env.TEMP).toBe(join(customRoot, 'cache', 'tmp'))
+    expect(env.TEMP).not.toBe(tmpdir())
   })
 
   it('makeStage 建在 data 下且可以干净删掉', () => {

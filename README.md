@@ -40,14 +40,17 @@ NapCat 首次启动需要十余秒完成 QQ 注入。多开只需重复第 2 步
 
 ## 从源码构建
 
-需要 Node.js 20+ 与 pnpm。
+开发平台为 Windows 10 / 11 x64，使用 Node.js 24.15+（24.x）与 pnpm 11.25.0。
 
-```bash
-pnpm install
-npm run dev      # 开发
-npm test         # 测试
-npm run dist     # 打包
+```powershell
+npm install --global pnpm@11.25.0
+node scripts/setup-dev.cjs  # 安装锁定依赖，检查 Electron 与项目资源
+pnpm dev                   # 开发（热更新）
+pnpm check                 # 环境检查、构建、单元与界面测试
+pnpm dist:dir              # 生成 Windows x64 免安装打包目录
 ```
+
+项目资源清单见 [resources.manifest.json](resources.manifest.json)，角色设定见 [角色参考](docs/design/astriax-character-reference/README.md)。Python、AstrBot 和 NapCat 运行时可在应用的「资源与环境」页安装。
 
 ## 许可
 

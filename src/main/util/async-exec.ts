@@ -240,7 +240,7 @@ export function psQuote(text: string): string {
  * 而且踩了之后报错信息（PowerShell 语法错误）完全指不到真正的原因。
  */
 export function expandArchive(zip: string, dest: string, opts: RunOptions = {}): Promise<RunResult> {
-  const script = `Expand-Archive -LiteralPath ${psQuote(zip)} -DestinationPath ${psQuote(dest)} -Force`
+  const script = `$ErrorActionPreference = 'Stop'; Expand-Archive -LiteralPath ${psQuote(zip)} -DestinationPath ${psQuote(dest)} -Force -ErrorAction Stop`
   return runPowerShell(script, opts)
 }
 

@@ -2,13 +2,19 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { MX_OFFICIAL_BASE } from '../../src/main/update/publish-urls'
 import { rmSync, existsSync, readFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
-import { downloadRuntime } from '../../src/main/update/runtime-download'
+import { downloadRuntime as realDownloadRuntime, type DownloadDeps } from '../../src/main/update/runtime-download'
 import { addCustomMirror, setMirrorPref, loadMirrors, BUILTIN_MIRRORS } from '../../src/main/update/mirror-store'
 import { createHash } from 'crypto'
 import { testStage } from '../helpers/stage'
 
 let root: string
 const sha = (s: string): string => createHash('sha256').update(s).digest('hex')
+
+// 下载字节已由用例注入；文件源的清单也需隔离，避免断网时等待真实服务器。
+const downloadRuntime = (deps: DownloadDeps) => realDownloadRuntime({
+  fetchJson: async () => { throw new Error('ECONNREFUSED') },
+  ...deps
+})
 
 beforeEach(() => {
   root = testStage('mx-dl-')
