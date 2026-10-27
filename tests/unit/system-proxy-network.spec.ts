@@ -41,13 +41,18 @@ describe('主进程网络跟随系统代理', () => {
     expect(updaterSetProxy).toHaveBeenCalledWith({ mode: 'system' })
   })
 
-  it('pipProxyEnv 只导出系统实际选中的代理', async () => {
+  it('pipProxyEnv 只导出系统实际选中的代理，并排除本机', async () => {
     const { pipProxyEnv } = await import('../../src/main/update/network')
     expect(await pipProxyEnv()).toEqual({
       HTTP_PROXY: 'http://127.0.0.1:10808',
       HTTPS_PROXY: 'http://127.0.0.1:10808',
       http_proxy: 'http://127.0.0.1:10808',
-      https_proxy: 'http://127.0.0.1:10808'
+      https_proxy: 'http://127.0.0.1:10808',
+      /*
+       * 用户自定义的 Python 源常在 localhost：经代理反而连不上，
+       * 所以 NO_PROXY 必须一起给（少了它，"本地源装不上"会回归）。
+       */
+      NO_PROXY: 'localhost,127.0.0.1,::1'
     })
   })
 
@@ -57,15 +62,17 @@ describe('主进程网络跟随系统代理', () => {
     expect(await pipProxyEnv()).toEqual({})
   })
 
-  it('SOCKS5 代理保持 socks5 协议，不能拼成 http://', async () => {
+  it('SOCKS5 代理：URL 保持 socks5 协议（不能拼成 http://）', async () => {
+    resolveProxy.mockResolvedValueOnce('SOCKS5 127.0.0.1:10808')
+    const { systemProxyUrl } = await import('../../src/main/update/network')
+    expect(await systemProxyUrl()).toBe('socks5://127.0.0.1:10808')
+  })
+
+  it('SOCKS5 代理不给 pip：内置 Python 没 PySocks，注入只会让 pip 直接失败', async () => {
     resolveProxy.mockResolvedValueOnce('SOCKS5 127.0.0.1:10808')
     const { pipProxyEnv } = await import('../../src/main/update/network')
-    expect(await pipProxyEnv()).toEqual({
-      HTTP_PROXY: 'socks5://127.0.0.1:10808',
-      HTTPS_PROXY: 'socks5://127.0.0.1:10808',
-      http_proxy: 'socks5://127.0.0.1:10808',
-      https_proxy: 'socks5://127.0.0.1:10808'
-    })
+    /* 返回空 = 让 pip 直连（原来就是直连，至少装得上） */
+    expect(await pipProxyEnv()).toEqual({})
   })
 
   it('HTTPS 代理保持 https://，不能降级成明文 HTTP', async () => {
@@ -75,7 +82,8 @@ describe('主进程网络跟随系统代理', () => {
       HTTP_PROXY: 'https://proxy.example:8443',
       HTTPS_PROXY: 'https://proxy.example:8443',
       http_proxy: 'https://proxy.example:8443',
-      https_proxy: 'https://proxy.example:8443'
+      https_proxy: 'https://proxy.example:8443',
+      NO_PROXY: 'localhost,127.0.0.1,::1'
     })
   })
 })

@@ -4029,6 +4029,20 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
           from: dl.usedLabel,
           sourceKey: dl.usedBase
         })
+        /*
+         * ★ 点选的源没成、实际从别的源下来时，必须留一条 WARN。
+         *
+         * 回退是对的（否则 GitHub 直连一挂就永远下不完），但"用户点 A、
+         * 文件来自 B"这件事不能在日志里被下一行的"已安装（来源 B）"轻轻带过 ——
+         * 事后查"为什么这次快/慢""文件到底从哪来的"要靠这条。
+         */
+        if (isMirrorBase && p.base !== dl.usedBase) {
+          opts.logger?.log(
+            'WARN',
+            'proc',
+            `NapCat ${pick.tag}：点选的源（${p.base || 'GitHub 直连'}）没下成，回退用了 ${dl.usedLabel}`
+          )
+        }
         // 装完作废版本列表缓存，界面上的「已安装」立刻是对的
 
         invalidateVersionCache(cfg.dataRoot)

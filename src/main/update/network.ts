@@ -74,7 +74,28 @@ export async function systemProxyUrl(): Promise<string | undefined> {
 
 export async function pipProxyEnv(): Promise<Record<string, string>> {
   const proxy = await systemProxyUrl()
-  return proxy
-    ? { HTTPS_PROXY: proxy, HTTP_PROXY: proxy, https_proxy: proxy, http_proxy: proxy }
-    : {}
+  if (!proxy) return {}
+  /*
+   * ★ SOCKS 不能给 pip。
+   *
+   * 内置 Python 里没有 PySocks（实测 `find_spec('socks')` 为空），
+   * pip 见到 `socks5://` 会直接报 "Missing dependencies for SOCKS support" ——
+   * 那比"不注入代理、让它直连"更糟：原来直连至少装得上。
+   * 所以只在 http/https 代理时注入。
+   */
+  if (/^socks/i.test(proxy)) return {}
+  return {
+    HTTPS_PROXY: proxy,
+    HTTP_PROXY: proxy,
+    https_proxy: proxy,
+    http_proxy: proxy,
+    /*
+     * ★ 本机不许走代理。
+     *
+     * 用户可以在界面上加自己的 Python 源，localhost / 127.0.0.1 的私有索引
+     * （devpi、本地缓存）经系统代理是连不上的 —— 代理转发不到 loopback。
+     * Windows 环境变量大小写不敏感，所以只写一份 NO_PROXY。
+     */
+    NO_PROXY: 'localhost,127.0.0.1,::1'
+  }
 }

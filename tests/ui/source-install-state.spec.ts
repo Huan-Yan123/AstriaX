@@ -16,6 +16,7 @@ function inject(opts: {
   installedAFrom?: string
   installedASourceKey?: string
   installedN?: string
+  installedNFrom?: string
   installedNSourceKey?: string
   latestA?: string
   latestN?: string
@@ -37,7 +38,7 @@ function inject(opts: {
       ? [{
           type: 'n',
           tag: opts.installedN,
-          from: 'gh-proxy.com',
+          from: opts.installedNFrom ?? 'gh-proxy.com',
           sourceKey: opts.installedNSourceKey
         }]
       : [])
@@ -189,6 +190,49 @@ describe('源行安装状态', () => {
     expect(rowOf(w, 'cors.isteed.cc').find('button').text()).toBe('下载')
     expect(rowOf(w, 'GitHub 直连').find('button').attributes('disabled')).toBeDefined()
     expect(rowOf(w, 'cors.isteed.cc').find('button').attributes('disabled')).toBeDefined()
+  })
+
+  it('已装来源已不在列表里（用户删了那个源）→ 不能灰禁整页，必须还能打开弹窗卸载', async () => {
+    /*
+     * 灰禁的代价是 `openPick` 进不去，而卸载入口就在版本弹窗里。
+     * 老记录的 sourceKey 指向一个已经不存在的源时，原来每一行都会变灰 ——
+     * 用户被锁在列表上，卸载和换源都点不到。
+     */
+    inject({
+      installedA: 'v4.29.3',
+      latestA: 'v4.29.3',
+      installedAFrom: '早就删掉的源',
+      installedASourceKey: 'https://removed.example/simple/'
+    })
+    const w = mount(DownloadPage)
+    await flushPromises()
+    await flushPromises()
+
+    const btn = rowOf(w, 'Python源').find('button')
+    expect(btn.text()).toBe('下载')
+    expect(btn.attributes('disabled')).toBeUndefined()
+
+    await btn.trigger('click')
+    await flushPromises()
+    expect(w.find('.vitem .uninstall-btn').exists(), '必须能进弹窗，卸载入口才在').toBe(true)
+  })
+
+  it('NapCat 同理：老记录只有来源标签、且该源已删 → 行仍可点', async () => {
+    inject({
+      installedN: 'v4.18.41',
+      latestN: 'v4.18.41',
+      installedNFrom: '早就删掉的源',
+      installedNSourceKey: 'https://removed.example/'
+    })
+    const w = mount(DownloadPage)
+    await flushPromises()
+    await flushPromises()
+
+    const btn = rowOf(w, 'GitHub 直连').find('button')
+    expect(btn.attributes('disabled')).toBeUndefined()
+    await btn.trigger('click')
+    await flushPromises()
+    expect(w.find('.vitem .uninstall-btn').exists()).toBe(true)
   })
 
   it('同名 Python 源按 sourceKey 判断，不能把同 label 的另一个源标成已安装', async () => {

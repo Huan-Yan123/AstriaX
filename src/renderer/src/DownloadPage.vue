@@ -592,11 +592,42 @@ function installedRowOf(type: 'a' | 'n'): RuntimeVersion | undefined {
     .sort((a, b) => cmpVersionTag(b.tag, a.tag))[0]
 }
 
+/**
+ * 已装版本的来源，在当前源列表里还找得到对应行吗？
+ *
+ * 找不到的两种情况都很常见：用户删掉了自己加的那个源；或者换版本之后
+ * 内置源的地址变了（老记录的 sourceKey 就指向一个不存在的 base）。
+ * 旧记录只有 from（标签），所以按标签兜底匹配。
+ */
+function originRowExists(type: 'a' | 'n', row: RuntimeVersion): boolean {
+  if (type === 'a') {
+    const list = pySources.value.sources
+    return row.sourceKey
+      ? list.some((s) => s.indexUrl === row.sourceKey)
+      : !!row.from && list.some((s) => s.label === row.from)
+  }
+  const list = githubMirrors.value
+  return row.sourceKey
+    ? list.some((m) => m.base === row.sourceKey)
+    : !!row.from && list.some((m) => m.label === row.from)
+}
+
 function sourceAction(type: 'a' | 'n', key: string): SourceAction {
   const installedRow = installedRowOf(type)
   if (!installedRow) return { state: 'download' }
   const installed = installedRow.tag
-  if (!isOriginSource(installedRow, type, key)) return { state: 'blocked', tag: installed }
+  if (!isOriginSource(installedRow, type, key)) {
+    /*
+     * ★ 来源行已经不在列表里时**不能灰禁整页**。
+     *
+     * 灰禁 = 按钮 disabled = `openPick` 进不去 = 版本弹窗打不开 ——
+     * 而「卸载」入口就在那个弹窗里。用户删掉自己装过的那个源之后，
+     * 整页每个源都灰，卸载和换源一起没了，只能去翻实例卡片。
+     * 所以只有"来源行还在、用户想换源"这一种情况才灰。
+     */
+    if (!originRowExists(type, installedRow)) return { state: 'download' }
+    return { state: 'blocked', tag: installed }
+  }
   const latest =
     type === 'a'
       ? sourceLatest.value.get('a')
