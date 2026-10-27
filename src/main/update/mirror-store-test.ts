@@ -1,4 +1,5 @@
 import { loadMirrors, type Mirror } from './mirror-store'
+import { systemFetch } from './network'
 
 export type MirrorStatus =
   /** 通了，而且这个源上真的有我们要的版本清单（可用） */
@@ -53,7 +54,7 @@ export async function testMirrors(deps: {
       const ctrl = new AbortController()
       const t = setTimeout(() => ctrl.abort(), timeout)
       try {
-        const r = await fetch(url, { signal: ctrl.signal })
+        const r = await systemFetch(url, { signal: ctrl.signal })
         // 读 body 才能判断"有没有货"；限制大小避免恶意/异常的超大响应
         const text = r.ok ? (await r.text()).slice(0, 2_000_000) : ''
         return { status: r.status, body: text }

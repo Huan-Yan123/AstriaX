@@ -12,6 +12,8 @@ export interface RuntimeVersion {
   tag: string
   dir: string
   from?: string
+  /** 稳定来源键：Python 源为 indexUrl，GitHub 源为 base；旧记录可能没有 */
+  sourceKey?: string
   installedAt: string
   sizeMB?: number
 }
@@ -27,7 +29,7 @@ export interface RuntimeStore {
   dirFor: (type: RuntimeType, tag: string) => string
   list: (type: RuntimeType) => RuntimeVersion[]
   all: () => RuntimeVersion[]
-  register: (p: { type: RuntimeType; tag: string; from?: string }) => RuntimeVersion
+  register: (p: { type: RuntimeType; tag: string; from?: string; sourceKey?: string }) => RuntimeVersion
   remove: (type: RuntimeType, tag: string) => void
   isInstalled: (type: RuntimeType, tag: string) => boolean
   latest: (type: RuntimeType) => RuntimeVersion | undefined
@@ -44,7 +46,14 @@ export interface RuntimeStore {
 }
 
 interface ManifestFile {
-  versions: Array<{ type: RuntimeType; tag: string; from?: string; installedAt: string; sizeMB?: number }>
+  versions: Array<{
+    type: RuntimeType
+    tag: string
+    from?: string
+    sourceKey?: string
+    installedAt: string
+    sizeMB?: number
+  }>
 }
 
 const FILE = 'runtimes.json'
@@ -436,6 +445,7 @@ export function createRuntimeStore(opts: { dataRoot: string }): RuntimeStore {
         tag,
         dir,
         from: rec?.from,
+        sourceKey: rec?.sourceKey,
         /*
          * ★ sizeMB 不再在这里算（主进程冻结的第一元凶，主人 0.1.3 实测）
          *
@@ -489,15 +499,16 @@ export function createRuntimeStore(opts: { dataRoot: string }): RuntimeStore {
 
     all: () => [...buildList('a'), ...buildList('n')],
 
-    register({ type, tag, from }) {
+    register({ type, tag, from, sourceKey }) {
       const dir = dirForChecked(type, tag)
       mkdirSync(dir, { recursive: true })
       const m = readManifest()
       const existing = m.versions.find((v) => v.type === type && v.tag === tag)
       if (existing) {
         if (from) existing.from = from
+        if (sourceKey !== undefined) existing.sourceKey = sourceKey
       } else {
-        m.versions.push({ type, tag, from, installedAt: new Date().toISOString() })
+        m.versions.push({ type, tag, from, sourceKey, installedAt: new Date().toISOString() })
       }
       writeManifest(m)
       /*
@@ -513,7 +524,7 @@ export function createRuntimeStore(opts: { dataRoot: string }): RuntimeStore {
         /* 补算是锦上添花：失败下次再算，绝不能影响安装结果 */
       })
       const hit = buildList(type).find((v) => v.tag === tag)
-      return hit ?? { type, tag, dir, from, installedAt: new Date().toISOString() }
+      return hit ?? { type, tag, dir, from, sourceKey, installedAt: new Date().toISOString() }
     },
 
     /**

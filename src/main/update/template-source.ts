@@ -1,4 +1,5 @@
 import { createHash } from 'crypto'
+import { systemFetch } from './network'
 
 export interface TemplateSource {
   type: 'a' | 'n'
@@ -71,7 +72,7 @@ async function fetchText(url: string, timeoutMs = 12000): Promise<string> {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), timeoutMs)
   try {
-    const r = await fetch(url, { signal: ctrl.signal })
+    const r = await systemFetch(url, { signal: ctrl.signal })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     return await r.text()
   } finally {

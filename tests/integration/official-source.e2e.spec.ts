@@ -162,6 +162,39 @@ describe('线上官方源端到端', () => {
     expect(r.bytes, '不该再是 117MB 的 Node 版').toBeLessThan(60_000_000)
   }, 300000)
 
+  it(
+    '真实下载 NapCat v4.18.41（复现用户点 gh-proxy.com 的失败）',
+    async () => {
+      const dest = join(root, 'n-v4.18.41.zip')
+      const t0 = Date.now()
+      const r = await downloadRuntime({
+        dataRoot: root,
+        type: 'n',
+        release: {
+          tag: 'v4.18.41',
+          assetName: 'NapCat.Shell.zip',
+          assetUrl:
+            'https://github.com/NapNeko/NapCatQQ/releases/download/v4.18.41/NapCat.Shell.zip',
+          sha256: '6801f93e533846cea05f4f531874a0e84371ab2331c5585b57cd7e3b869cf96b'
+        },
+        destFile: dest,
+        onlyBase: 'https://gh-proxy.com/'
+      })
+      expect(r.sha256).toBe('6801f93e533846cea05f4f531874a0e84371ab2331c5585b57cd7e3b869cf96b')
+      expect(r.bytes).toBe(35_894_640)
+      console.log(
+        'REAL_DOWNLOAD:',
+        JSON.stringify({
+          ms: Date.now() - t0,
+          bytes: r.bytes,
+          sha256: r.sha256,
+          usedLabel: r.usedLabel
+        })
+      )
+    },
+    600000
+  )
+
   it('UI 不暴露服务器 IP：内置源标签为「AstriaX官方源」', async () => {
     const { BUILTIN_MIRRORS } = await import('../../src/main/update/mirror-store')
     const official = BUILTIN_MIRRORS.find((m) => m.mode === 'files')

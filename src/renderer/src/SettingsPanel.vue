@@ -724,7 +724,8 @@ onBeforeUnmount(stopBusyPoll)
   max-width: calc(100vw - 56px);
   max-height: calc(100vh - 90px);
   overflow: hidden;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  /* 正文面板用近实色底；外层遮罩仍保留玻璃感，避免小字号被透明合成发灰。 */
+  background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
   border: 1px solid var(--glass-edge);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
@@ -903,7 +904,7 @@ onBeforeUnmount(stopBusyPoll)
   color: var(--ink);
 }
 .rtext small {
-  font-size: 11.5px;
+  font-size:12px;
   color: var(--ink-soft);
   line-height: 1.5;
 }
@@ -955,11 +956,10 @@ onBeforeUnmount(stopBusyPoll)
 }
 .pick {
   border: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: #fff;
   border-radius: var(--radius-ctrl);
   padding: 7px 14px;
-  font-size: 12.5px;
+  font-size:13px;
   color: var(--ink-soft);
 }
 .pick.on {
@@ -973,7 +973,7 @@ onBeforeUnmount(stopBusyPoll)
   border-color: var(--primary);
   color: #fff;
   padding: 8px 18px;
-  font-weight: 500;
+  font-weight:var(--fw-medium);
   transition-property: background-color, transform;
   transition-duration: 140ms;
   transition-timing-function: ease-out;
@@ -1006,7 +1006,7 @@ onBeforeUnmount(stopBusyPoll)
  */
 .qqnum {
   margin-left: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font);
   font-size: 14px;
   letter-spacing: 0.4px;
   color: var(--primary-deep);
@@ -1041,8 +1041,7 @@ onBeforeUnmount(stopBusyPoll)
   border-radius: 8px;
   padding: 4px 8px;
   font-size: 12px;
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: #fff;
   color: var(--ink);
 }
 /* 审计原文一行一条，等宽字体便于对齐时间戳 */
@@ -1054,8 +1053,8 @@ onBeforeUnmount(stopBusyPoll)
   border-radius: var(--radius-ctrl);
   background: var(--card-n);
   border: 1px solid var(--hairline);
-  font-family: 'Cascadia Mono', 'Consolas', monospace;
-  font-size: 11.5px;
+  font-family: var(--font);
+  font-size:12px;
   line-height: 1.7;
   color: var(--ink-soft);
   white-space: pre-wrap;

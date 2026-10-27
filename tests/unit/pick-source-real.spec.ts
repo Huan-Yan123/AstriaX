@@ -88,6 +88,24 @@ async function installWith(opts: {
       return { status: 0, stdout: '', stderr: '' }
     },
     /*
+     * 固定版本目录：runtime:install 只应在测试里读这份数据，
+     * 不能为了验证 pip 参数而请求真实 PyPI。
+     */
+    fetchVersionJson: async () =>
+      JSON.stringify({
+        astrbot: [{ tag: 'v4.28.0', asset: 'pypi:astrbot', sha256: '', size: 1 }],
+        releases: {
+          '4.28.0': [
+            {
+              filename: 'astrbot-4.28.0-py3-none-any.whl',
+              url: 'https://example.invalid/astrbot-4.28.0-py3-none-any.whl',
+              size: 1,
+              digests: { sha256: 'aa' }
+            }
+          ]
+        }
+      }),
+    /*
      * 让列版本能返回 v4.28.0 —— 否则 install 会在"找不到这个版本"处抛错，
      * 根本走不到 pip（那样测试就变成了空转）。
      */

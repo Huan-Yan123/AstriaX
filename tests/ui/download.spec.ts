@@ -11,7 +11,10 @@ interface Calls {
   pref: Array<{ a?: string; n?: string }>
 }
 
-function inject(opts: { runtimes?: Array<{ type: 'a' | 'n'; tag: string; sizeMB?: number }>; versions?: Array<Record<string, unknown>> } = {}): Calls {
+function inject(opts: {
+  runtimes?: Array<{ type: 'a' | 'n'; tag: string; sizeMB?: number; from?: string }>
+  versions?: Array<Record<string, unknown>>
+} = {}): Calls {
   const calls: Calls = { installed: [], removed: [], installedRuntimes: [], pref: [] }
   const runtimes = opts.runtimes ?? []
   /** Python 是否已装（install 之后要真的变 true，见下面 python 段的注释） */
@@ -247,7 +250,7 @@ describe('下载页', () => {
   })
 
   it('已安装的版本按钮变成「已安装」且不可点', async () => {
-    inject({ runtimes: [{ type: 'n', tag: 'v4.18.19', sizeMB: 111.7 }] })
+    inject({ runtimes: [{ type: 'n', tag: 'v4.18.19', sizeMB: 111.7, from: 'gh-proxy.com' }] })
     const w = mount(DownloadPage)
     await flushPromises()
     /*
@@ -260,12 +263,13 @@ describe('下载页', () => {
     const groups = w.findAll('.source-block')
     const napcatGroup = groups.find((s) => s.text().includes('NapCat'))!
     expect(napcatGroup, '找得到 NapCat 分组').toBeTruthy()
-    const openBtn = napcatGroup.findAll('.source-row button').find((b) => b.text() === '下载')!
+    const openBtn = napcatGroup.findAll('.source-row button').find((b) => b.text() === '已安装')!
     await openBtn.trigger('click')
     await flushPromises()
-    const done = w.findAll('button').find((b) => b.text() === '已安装')
+    const done = w.find('.vitem .status-chip.installed')
     expect(done).toBeTruthy()
-    expect((done!.element as HTMLButtonElement).disabled).toBe(true)
+    expect(done.text()).toBe('已安装')
+    expect((done.element as HTMLButtonElement).disabled).toBe(true)
     // 未装的还是「下载」
     expect(w.findAll('.vitem button').some((b) => b.text() === '下载')).toBe(true)
   })
@@ -324,7 +328,7 @@ describe('下载页', () => {
     await del.trigger('click')
     await flushPromises()
     // 确认弹窗 → 删除
-    const confirm = w.findAll('.dlg button').find((b) => b.text() === '删除')!
+    const confirm = w.findAll('.dlg button').find((b) => b.text() === '卸载')!
     await confirm.trigger('click')
     await flushPromises()
     expect(calls.removed).toHaveLength(1)

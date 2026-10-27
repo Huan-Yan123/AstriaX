@@ -207,8 +207,8 @@ const typeName = computed(() => props.inst.type === 'a' ? 'AstrBot' : 'NapCat')
   left: 0;
   padding: 4px 12px;
   border-radius: var(--radius-card) 0 8px 0;
-  font-size: 11px;
-  font-weight: 600;
+  font-size:12px;
+  font-weight: var(--fw-bold);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -235,7 +235,7 @@ const typeName = computed(() => props.inst.type === 'a' ? 'AstrBot' : 'NapCat')
 .name {
   margin: 0 0 6px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: var(--fw-bold);
   color: var(--ink);
 }
 
@@ -248,7 +248,7 @@ const typeName = computed(() => props.inst.type === 'a' ? 'AstrBot' : 'NapCat')
 }
 
 .type {
-  font-weight: 500;
+  font-weight:var(--fw-medium);
 }
 
 .version.unknown {
@@ -257,8 +257,8 @@ const typeName = computed(() => props.inst.type === 'a' ? 'AstrBot' : 'NapCat')
 }
 
 .port {
-  font-family: 'Cascadia Code', 'SF Mono', Consolas, monospace;
-  font-weight: 500;
+  font-family: var(--font);
+  font-weight:var(--fw-medium);
 }
 
 .actions {

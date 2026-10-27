@@ -3,6 +3,7 @@ import { join } from 'path'
 import { readJsonFile } from '../util/json-file'
 import { loadMirrors, resolveFileUrl, type Mirror } from './mirror-store'
 import { TEMPLATE_SOURCES } from './template-source'
+import { systemFetch } from './network'
 
 export interface VersionItem {
   tag: string
@@ -152,7 +153,7 @@ async function defaultFetchJson(url: string): Promise<string> {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), 15000)
   try {
-    const r = await fetch(url, { signal: ctrl.signal })
+    const r = await systemFetch(url, { signal: ctrl.signal })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     return await r.text()
   } finally {

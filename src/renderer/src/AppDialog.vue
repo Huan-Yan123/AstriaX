@@ -455,7 +455,7 @@ function submit(): void {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
   border: 1px solid var(--glass-edge);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
@@ -465,7 +465,7 @@ function submit(): void {
 }
 h3 {
   margin: 0 0 8px;
-  font-size: 15.5px;
+  font-size:16px;
 }
 .body {
   margin: 0;
@@ -492,10 +492,9 @@ h3 {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-ctrl);
   padding: 9px 12px;
-  font-size: 13.5px;
+  font-size:14px;
   font-family: inherit;
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: #fff;
   outline: none;
 }
 .f input:focus {
@@ -503,7 +502,7 @@ h3 {
 }
 .err {
   color: var(--danger);
-  font-size: 12.5px;
+  font-size:13px;
   margin: 8px 0 0;
 }
 .row {
@@ -552,7 +551,7 @@ h3 {
   padding: 9px 12px;
   border-radius: 10px;
   border: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.64);
+  background: #fff;
   color: var(--ink);
   font-size: 13px;
   font-variant-numeric: tabular-nums;
@@ -571,7 +570,7 @@ h3 {
 }
 .caret {
   flex: 0 0 auto;
-  font-size: 9px;
+  font-size:12px;
   color: var(--ink-soft);
   line-height: 1;
 }
@@ -600,7 +599,7 @@ h3 {
   padding: 9px 12px;
   border-radius: 10px;
   border: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.56);
+  background: #fff;
   color: var(--ink);
   font-size: 13px;
   font-variant-numeric: tabular-nums; /* 版本号数字等宽，上下对齐 */
@@ -622,7 +621,7 @@ h3 {
   border-color: var(--primary);
   background: rgba(210, 227, 255, 0.8);
   color: var(--primary-deep);
-  font-weight: 600;
+  font-weight: var(--fw-bold);
 }
 /*
  * 当前正在用的那个：浅底 + 边线，与"已选中"（打勾）区分开。
@@ -638,13 +637,13 @@ h3 {
 /* 「当前」小标签：只在文字里区分，不另加一套视觉 */
 .nowtag {
   flex: 0 0 auto;
-  font-size: 11px;
-  font-weight: 400;
+  font-size:12px;
+  font-weight:var(--fw-regular);
   color: var(--ink-soft);
   border: 1px solid var(--hairline);
   border-radius: 6px;
   padding: 1px 6px;
-  background: rgba(255, 255, 255, 0.58);
+  background: #fff;
 }
 .tick {
   /* 固定宽度：有勾和没勾的项，文字起始位置要一样 */
@@ -652,7 +651,7 @@ h3 {
   flex: 0 0 14px;
   text-align: center;
   color: var(--primary);
-  font-weight: 700;
+  font-weight:var(--fw-bold);
 }
 .ctext {
   flex: 1 1 auto;
@@ -678,8 +677,7 @@ h3 {
   padding: 8px 18px;
   font-size: 13px;
   border: 1px solid var(--hairline);
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: #fff;
   color: var(--ink-soft);
   transition: all 0.14s ease;
 }

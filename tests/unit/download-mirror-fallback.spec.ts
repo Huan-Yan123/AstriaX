@@ -14,7 +14,7 @@
  * ══════════════════════════════════════════════════════════════════════════
  *
  * 下载时传的是 `onlyBase: mirror?.base ?? prefBase` —— `prefBase` 是
- * **配置里的首选源**（他设了官方源）。而 `downloadRuntime` 里：
+ * **配置里的首选源**（他设了官方源）。当时 `downloadRuntime` 里：
  *
  *     const order = deps.onlyBase !== undefined
  *       ? mirrorOrderFor(...).filter((m) => m.base === deps.onlyBase)  // ← 只剩 1 个
@@ -26,7 +26,7 @@
  * ## 修法
  *
  * 按"用户有没有**显式点**这个源"区分：
- *   · 点了（`isMirrorBase`）→ `onlyBase` 锁死它（尊重选择）
+ *   · 点了（`isMirrorBase`）→ 传 `onlyBase`，先完整试它，失败后仍回退
  *   · 没点（用配置首选）    → **不传 onlyBase**，让首选源排最前、其余回退
  *
  * ## 这条测试钉什么
@@ -82,19 +82,6 @@ describe('★★首选源下不到 → 继续试别的源', () => {
 
       expect(order.length, '★候选**不能只有一个**，否则没有回退余地').toBeGreaterThan(1)
       expect(order[0].base, '首选源排最前').toBe(OFFICIAL_FILES)
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-  it('★★传了 onlyBase=首选源 → 候选被缩到 1 个（这正是那个 bug 的机制）', () => {
-    const root = seedRoot(OFFICIAL_FILES)
-    try {
-      const all = mirrorOrderFor(root, 'n')
-      const pref = OFFICIAL_FILES
-      const filtered = all.filter((m) => m.base === pref)
-      console.log(`\n  全部源 ${all.length} 个 → 传 onlyBase 之后只剩 ${filtered.length} 个`)
-      expect(filtered).toHaveLength(1)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -178,7 +165,7 @@ describe('★★首选源下不到 → 继续试别的源', () => {
  *（尺子验证过：改回去就红）。
  *
  * 判据是**语义**而不是字面串：必须是 `isMirrorBase ? ... : undefined`
- * 这个形状 —— 也就是"只有用户显式点了源才锚定"。
+ * 这个形状 —— 只有用户显式点了源才把它排到候选链最前；失败后仍可回退。
  */
 describe('★★接线守卫：只有用户显式点源才锚定', () => {
   it('runtime:install 的 onlyBase 必须是「点了才锁、没点就放开」', () => {
@@ -205,8 +192,8 @@ describe('★★接线守卫：只有用户显式点源才锚定', () => {
     expect(
       m,
       '★`runtime:install` 的 `onlyBase` 必须写成 `isMirrorBase ? p.base : undefined`\n' +
-        '（= 只有用户在界面上**显式点了某个镜像源**才锚定它；\n' +
-        '  只是配置里的首选源时不锚定，好让别的源能回退）。\n' +
+        '（= 只有用户在界面上**显式点了某个镜像源**才把它排第一；\n' +
+        '  它失败后仍由 downloadRuntime 回退其余源）。\n' +
         '写成 `mirror?.base ?? prefBase` 会锚死首选源 ——\n' +
         '主人实测的「试过 1 个镜像源都没成 / HTTP 404」就是这么来的。'
     ).toBeTruthy()

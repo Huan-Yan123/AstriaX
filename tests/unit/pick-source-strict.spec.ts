@@ -138,7 +138,7 @@ describe('③ 渲染层守卫：弹窗必须把点中的源传下去', () => {
 
   it('★install() 传的是 indexUrl（Python 源的地址在 indexUrl 上）', () => {
     const src = stripComments(PAGE())
-    const i = src.indexOf('async function install')
+    const i = src.indexOf('async function install(')
     expect(i, '找不到 install()').toBeGreaterThan(0)
     const body = src.slice(i, i + 1200)
     expect(

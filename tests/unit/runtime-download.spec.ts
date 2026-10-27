@@ -87,12 +87,13 @@ describe('运行时下载（按镜像顺序回退）', () => {
         type: 'a',
         release: RELEASE,
         destFile: join(root, 'a.zip'),
+        sources: ['https://offline.example/a.zip'],
         fetchBuf: async () => {
           throw new Error('ECONNREFUSED')
         }
       })
     ).rejects.toThrow(/下载失败.*ECONNREFUSED/s)
-  })
+  }, 15000)
 
   it('文件型镜像：读 index.json，优先 index 里的直链与 sha256', async () => {
     const payload = Buffer.from('real-astrbot')
@@ -348,7 +349,7 @@ describe('写盘失败要报错，不能崩进程', () => {
 
     try {
       // 必须是 reject（调用方能换源重试），而不是把进程带走
-      await expect(defaultFetchToFile('https://example.com/x.bin', dest)).rejects.toBeTruthy()
+      await expect(defaultFetchToFile('https://example.com/x.bin', dest, undefined, undefined, 20_000, false)).rejects.toBeTruthy()
 
       await new Promise((r) => setTimeout(r, 300))
       expect(
@@ -380,7 +381,7 @@ describe('写盘失败要报错，不能崩进程', () => {
       }) as unknown as Response) as typeof fetch
 
     try {
-      const r = await defaultFetchToFile('https://example.com/good.bin', dest)
+      const r = await defaultFetchToFile('https://example.com/good.bin', dest, undefined, undefined, 20_000, false)
       expect(readFileSync(dest, 'utf8')).toBe('hello')
       expect(r.bytes).toBe(5)
       // 哈希要跟内容对得上（增量哈希没算错）

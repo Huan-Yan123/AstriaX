@@ -7,6 +7,9 @@ files:
   - out/**
   - package.json
 extraResources:
+  # 内置思源黑体按 SIL OFL 1.1 分发，许可证必须随安装包一起提供。
+  - from: src/renderer/src/assets/fonts/OFL.txt
+    to: fonts/SourceHanSans-OFL.txt
   # 托盘 / 窗口图标。
   #
   # 【为什么放 extraResources 而不是 files】
