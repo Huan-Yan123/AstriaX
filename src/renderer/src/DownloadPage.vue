@@ -2324,7 +2324,7 @@ onUnmounted(() => {
       </main>
     </div>
 
-    <Transition name="pop"><div v-if="picking" class="mask" @click.self="picking = null"><div class="dlg"><header class="dhead"><h2>{{ picking.label }}</h2><button class="tool-btn" :disabled="loadingVersions" @click="loadVersions(true)">{{ loadingVersions ? '读取中' : '刷新' }}</button><button class="x" @click="picking = null">×</button></header><p v-if="versionSourceHint" class="srcline">{{ versionSourceHint }}</p><div class="vlist"><p v-if="loadingVersions" class="none">正在读取版本列表…</p><p v-else-if="!versions.length" class="none">这个源上没读到版本</p>
+    <Transition name="pop"><div v-if="picking" class="mask" @click.self="picking = null"><div class="dlg"><header class="dhead"><h2>{{ picking.label }}</h2><button class="tool-btn" :disabled="loadingVersions" @click="loadVersions(true)">{{ loadingVersions ? '读取中' : '刷新' }}</button><button class="x" @click="picking = null">×</button></header><p v-if="versionSourceHint" class="srcline">{{ versionSourceHint }}</p><div class="vlist"><p v-if="loadingVersions" class="none">正在读取版本列表…</p><p v-else-if="!versions.length" class="none">没读到版本：网络不通或这个源暂时列不出清单，点上面的「刷新」再试一次</p>
       <div v-for="v in versions" :key="v.tag" class="vitem">
         <div class="vinfo"><b>{{ v.tag }}</b><span v-if="v.prerelease" class="tag warn">测试版</span></div>
         <div class="vright">
