@@ -51,6 +51,7 @@ function make(mode: { ok: true; file: string } | { ok: false; msg: string } | nu
     downloadsDir: () => downloads,
     appVersion: () => '0.1.3',
     appUpdater: mode ? fakeUpdater(mode) : undefined,
+    runCommand: async () => ({ status: 0, stdout: '', stderr: '' }),
     fetchUpdateToFile: async (_url, outPath) => {
       fetched.push(outPath)
       writeFileSync(outPath, 'PK-fake-full-installer')

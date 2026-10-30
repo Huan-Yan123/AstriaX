@@ -306,7 +306,7 @@ function goDownload(): void {
   overflow: auto;
   border: 1px solid var(--glass-edge);
   border-radius: 20px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
   padding: 24px 28px;
   -webkit-backdrop-filter: blur(28px) saturate(160%);
   backdrop-filter: blur(28px) saturate(160%);
@@ -339,8 +339,7 @@ function goDownload(): void {
   border-radius: var(--radius-ctrl);
   padding: 10px 12px;
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: #fff;
   font-family: inherit;
 }
 .f select:focus,
@@ -352,7 +351,7 @@ function goDownload(): void {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12.5px;
+  font-size:13px;
   color: var(--ink-soft);
 }
 /*
@@ -386,7 +385,7 @@ function goDownload(): void {
 .hint {
   display: block;
   color: var(--ink-soft);
-  font-size: 11.5px;
+  font-size:12px;
   margin-top: 5px;
 }
 /* 前置条件没满足：一条淡黄提示 + 一个前往按钮，不用系统原生提示框 */
@@ -399,15 +398,14 @@ function goDownload(): void {
   border-radius: 11px;
   background: rgba(253, 246, 230, 0.68);
   border: 1px solid rgba(240, 226, 194, 0.82);
-  backdrop-filter: blur(8px);
-  font-size: 12.5px;
+  font-size:13px;
   color: #8a6d2f;
 }
 .blocked .go {
   margin-left: auto;
   flex: none;
   border: 1px solid var(--primary);
-  background: rgba(255, 255, 255, 0.62);
+  background: #fff;
   color: var(--primary-deep);
   border-radius: 8px;
   padding: 4px 12px;
@@ -423,12 +421,12 @@ function goDownload(): void {
 }
 .warn {
   color: #a06f00;
-  font-size: 12.5px;
+  font-size:13px;
   line-height: 1.55;
 }
 .err {
   color: var(--danger);
-  font-size: 12.5px;
+  font-size:13px;
 }
 .sub {
   color: var(--ink-soft);
@@ -445,7 +443,7 @@ function goDownload(): void {
 }
 .row button {
   font-family: inherit;
-  font-size: 13.5px;
+  font-size:14px;
   border-radius: 10px;
   padding: 9px 20px;
   border: 1px solid transparent;
@@ -458,7 +456,7 @@ function goDownload(): void {
   transform: scale(0.97);
 }
 .row .ghost {
-  background: rgba(255, 255, 255, 0.58);
+  background: #fff;
   border-color: var(--hairline);
   color: var(--ink-soft);
 }
@@ -469,7 +467,7 @@ function goDownload(): void {
 .row .main {
   background: var(--primary);
   color: #fff;
-  font-weight: 500;
+  font-weight:var(--fw-medium);
   box-shadow: 0 2px 8px rgba(74, 125, 219, 0.26);
 }
 .row .main:hover:not(:disabled) {

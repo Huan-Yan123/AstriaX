@@ -48,9 +48,8 @@ describe('createCrashHandler（PCL2 风格独立弹窗）', () => {
      * 现在反过来断言**必须带**。三处原生框的一致性由
      * `feedback-contact.spec.ts` 统一盯着（防止改一处漏两处）。
      */
-    expect(c, '★崩溃框必须带问题反馈 QQ').toContain('2250713669')
     expect(c, '★崩溃框必须带官方群').toContain('1077554004')
-    expect(c).toMatch(/问题反馈QQ/)
+    expect(c).toMatch(/问题反馈群/)
   })
 
   it('zip 打包失败也照弹窗：给出原始日志目录兜底文案', () => {

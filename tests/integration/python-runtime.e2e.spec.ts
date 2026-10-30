@@ -1,9 +1,11 @@
+// @vitest-environment node
 // 真实落地内置 Python 3.12.10 并验证可执行（网络 + 解压 + site 打开）
 import { describe, it, expect, afterAll } from 'vitest'
 import { existsSync, rmSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { spawnSync } from 'child_process'
 import { PYTHON_VERSION, PYTHON_SOURCES, pythonDirFor, pythonExeFor, enableEmbedSite, ensurePip } from '../../src/main/runtime/python-runtime'
+import { systemFetch } from '../../src/main/update/network'
 import { testStage } from '../helpers/stage'
 
 const root = testStage('mx-py-e2e-')
@@ -17,7 +19,7 @@ describe('内置 Python 端到端', () => {
     let lastErr = ''
     for (const url of PYTHON_SOURCES) {
       try {
-        const r = await fetch(url)
+        const r = await systemFetch(url)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         const buf = Buffer.from(await r.arrayBuffer())
         writeFileSync(zip, buf)

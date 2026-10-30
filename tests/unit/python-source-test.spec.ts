@@ -70,7 +70,12 @@ describe('★Python 源测速（与 GitHub 源同一套形态）', () => {
       sources: [BUILTIN_PYTHON_SOURCES[0]],
       fetchText: async () => ({ status: 200, body: '   \n  ' })
     })
-    expect(rows[0].status, '一个空的索引页等于拿不到东西').toBe('unreachable')
+    /*
+     * 归 `empty` 而不是 `unreachable`：服务是活的（HTTP 200），只是没货。
+     * 两者对用户的含义不同 —— "不可达"会让人去查网络，
+     * 而真相是这个源上没有 astrbot，换个源就行（见 python-source-test.ts 的注释）。
+     */
+    expect(rows[0].status, '一个空的索引页等于拿不到东西').toBe('empty')
     expect(rows[0].reason).toContain('空')
   })
 

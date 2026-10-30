@@ -392,6 +392,7 @@ describe('★更新方式：只下载，绝不自动运行安装包', () => {
         probe: () => Promise.resolve(true),
         downloadsDir: () => dir,
         appVersion: () => '0.1.0',
+        runCommand: async () => ({ status: 0, stdout: '', stderr: '' }),
         fetchUpdateToFile: async (_url, outPath) => {
           writeFileSync(outPath, 'PK-fake-installer')
           return 18
@@ -424,6 +425,7 @@ describe('★更新方式：只下载，绝不自动运行安装包', () => {
         probe: () => Promise.resolve(true),
         downloadsDir: () => dir,
         appVersion: () => '0.1.0',
+        runCommand: async () => ({ status: 0, stdout: '', stderr: '' }),
         fetchUpdateToFile: async (_url, outPath) => {
           fetchCalls++
           writeFileSync(outPath, 'X')

@@ -26,6 +26,7 @@
 import { existsSync, mkdirSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { createHash } from 'crypto'
+import { systemFetch } from './network'
 
 export interface AppUpdateManifest {
   /** 最新版本号，形如 "0.2.0" */
@@ -245,7 +246,7 @@ export async function pickFastestSource(
   opts: { timeoutMs?: number; fetchImpl?: typeof fetch } = {}
 ): Promise<{ url: string; ms: number; label?: string } | undefined> {
   if (!urls.length) return undefined
-  const doFetch = opts.fetchImpl ?? fetch
+  const doFetch: typeof fetch = opts.fetchImpl ?? systemFetch
   const timeoutMs = opts.timeoutMs ?? 8000
 
   const probeOne = async (url: string): Promise<{ url: string; ms: number } | undefined> => {

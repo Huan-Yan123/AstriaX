@@ -1602,10 +1602,11 @@ async function showCreds(x: Instance): Promise<void> {
   height: 100vh;
   position: relative;
   isolation: isolate;
-  background:
-    radial-gradient(ellipse at 12% 8%, rgba(177, 204, 255, 0.25), transparent 36%),
-    radial-gradient(ellipse at 88% 92%, rgba(205, 220, 255, 0.2), transparent 34%),
-    var(--bg);
+  /*
+   * 正文区必须是实色底。带 alpha 的渐变会让整页文字走一次透明合成，
+   * 12px 中文在 96 DPI 下会明显发灰；侧栏/标题栏保留玻璃感即可。
+   */
+  background: var(--bg);
 }
 .logfull {
   position: fixed;
@@ -1634,7 +1635,7 @@ async function showCreds(x: Instance): Promise<void> {
   overflow: auto;
   margin: 0;
   padding: 14px 20px;
-  font: 12px/1.6 'JetBrains Mono', Consolas, monospace;
+  font: 12px/1.6 var(--font);
   white-space: pre-wrap;
   background: #fafbfd;
 }
@@ -1661,7 +1662,7 @@ async function showCreds(x: Instance): Promise<void> {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-weight: 650;
+  font-weight: var(--fw-bold);
   font-size: 13px;
   color: var(--primary-deep);
   letter-spacing: 0.2px;
@@ -1705,7 +1706,7 @@ async function showCreds(x: Instance): Promise<void> {
   -webkit-backdrop-filter: blur(18px) saturate(140%);
   border-bottom: 1px solid rgba(220, 228, 241, 0.6);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
-  font-size: 12.5px;
+  font-size:13px;
   color: var(--ink-soft);
   flex: 0 0 auto;
 }
@@ -1722,7 +1723,7 @@ async function showCreds(x: Instance): Promise<void> {
   border-radius: var(--radius-ctrl);
   background: #fff;
   color: var(--danger);
-  font-size: 12.5px;
+  font-size:13px;
 }
 .webbtn:hover {
   background: var(--danger);
@@ -1807,7 +1808,7 @@ async function showCreds(x: Instance): Promise<void> {
   gap: 12px;
   padding: 0 12px;
   font-size: 13px;
-  font-weight: 550;
+  font-weight: var(--fw-medium);
   color: var(--ink-soft);
   transition: background 0.14s ease, color 0.14s ease;
 }
@@ -1838,7 +1839,7 @@ async function showCreds(x: Instance): Promise<void> {
 }
 .topbar span {
   color: var(--ink-soft);
-  font-size: 12.5px;
+  font-size:13px;
 }
 .createbtn {
   margin-left: auto;
@@ -1848,7 +1849,7 @@ async function showCreds(x: Instance): Promise<void> {
   background: var(--primary);
   color: #fff;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: var(--fw-medium);
 }
 .createbtn:hover {
   background: var(--primary-deep);
@@ -1905,7 +1906,7 @@ async function showCreds(x: Instance): Promise<void> {
 .dlg.confirm {
   position: relative;
   isolation: isolate;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  background: linear-gradient(145deg, #ffffff 0%, #f7faff 100%);
   border: 1px solid var(--glass-edge);
   border-radius: 20px;
   padding: 22px 24px;
@@ -1994,7 +1995,7 @@ async function showCreds(x: Instance): Promise<void> {
   margin: 0 0 8px;
   color: var(--ink);
   font-size: 23px;
-  font-weight: 650;
+  font-weight: var(--fw-bold);
   letter-spacing: -0.02em;
 }
 .emptyline {
@@ -2021,8 +2022,8 @@ async function showCreds(x: Instance): Promise<void> {
   background: var(--primary);
   color: #fff;
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size:14px;
+  font-weight:var(--fw-medium);
   padding: 9px 22px;
   border-radius: var(--radius-ctrl);
   cursor: pointer;
@@ -2113,8 +2114,8 @@ async function showCreds(x: Instance): Promise<void> {
   border-radius: 6px;
   background: color-mix(in srgb, var(--primary) 10%, white);
   color: var(--primary-deep);
-  font-size: 11px;
-  font-weight: 700;
+  font-size:12px;
+  font-weight:var(--fw-bold);
 }
 .railbtn svg {
   width: 20px;
@@ -2167,7 +2168,7 @@ async function showCreds(x: Instance): Promise<void> {
   background: var(--card-n);
   color: var(--ink);
   padding: 6px 14px;
-  font-size: 12.5px;
+  font-size:13px;
   font-family: inherit;
   cursor: pointer;
 }

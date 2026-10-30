@@ -120,7 +120,7 @@ import { pruneOldLogs } from './logs/prune'
 
 import { createProgressTracker, humanSize, type ProgressState } from './update/progress'
 
-import { createPipProgress } from './update/pip-progress'
+import { createPipByteSampler, createPipProgress } from './update/pip-progress'
 
 import { ensureTemplate } from './update/templates'
 
@@ -172,7 +172,10 @@ import {
   BACKUP_KEEP_DEFAULT,
   NAPCAT_DEFAULT_TOKEN,
   PORT_RANGE_A,
-  type InstanceType} from './constants'/**
+  type InstanceType} from './constants'
+import { applySystemProxy, pipProxyEnv, systemFetch } from './update/network'
+
+/**
  * 下载进度事件：主进程 → 渲染层（无 window 时静默，便于测试与无 GUI 场景）
  */
 export interface DownloadProgressEvent extends ProgressState {
@@ -2334,7 +2337,15 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
        * 探测失败（全都探测不通）时回落到**清单给的那个 url** ——
        * 至少让它按原样试一次，而不是直接报错（多一条路总比少一条好）。
        */
-      const fastest = await pickFastestSource(candidates.map((c) => c.url)).catch(() => undefined)
+      /*
+       * 单测注入 fetchUpdateToFile 时禁用真实测速。
+       * fetchUpdateToFile 在生产由 registerIpcHandlersReal 注入，测试也用它
+       * 提供本地文件，所以不能只看它是否存在。runCommand 是已有的测试
+       * 注入点；生产不注入，仍测速选最快源。
+       */
+      const fastest = opts.runCommand
+        ? undefined
+        : await pickFastestSource(candidates.map((c) => c.url)).catch(() => undefined)
       const chosen = fastest?.url ?? url
       if (fastest) {
         /*
@@ -3309,10 +3320,20 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
  * ★ 关键：pip 索引源不能当 onlyBase（它没有 versions.json）。 用 `undefined` 让 version-catalog 走"AstrBot 列 PyPI"的正路。
  */
         onlyBase: isMirrorBase ? prefBase : undefined,
-        includePrerelease: true
+        includePrerelease: true,
+        // 测试注入时固定版本目录；生产不注入，仍走真实网络。
+        fetchJson: opts.fetchVersionJson,
+        noCache: opts.fetchVersionJson ? true : undefined
       })
       const pick = list.find((v) => v.tag === p.tag)
-        // 首选源上没这个版本时，从全量结果里找（多为 PyPI 那条）        ?? (await listVersions({ dataRoot: cfg.dataRoot, type: p.type, includePrerelease: true })).find((v) => v.tag === p.tag)
+        // 首选源上没这个版本时，从全量结果里找（多为 PyPI 那条）
+        ?? (await listVersions({
+          dataRoot: cfg.dataRoot,
+          type: p.type,
+          includePrerelease: true,
+          fetchJson: opts.fetchVersionJson,
+          noCache: opts.fetchVersionJson ? true : undefined
+        })).find((v) => v.tag === p.tag)
 
       if (!pick) throw new Error(`找不到 ${p.tag} 这个版本，刷新一下版本列表`)
       const store = runtimeStore(cfg.dataRoot)
@@ -3342,6 +3363,13 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
  */
 
         const pip = createPipProgress()
+        /*
+         * 速度的主信号：从 "Downloading ... (207 kB)" 行累计字节。
+         * 为什么不能只靠下面的 `Progress N of M`：pip 只在单文件 > 512KB
+         * 时才打那行，而 AstrBot 的依赖绝大多数更小 —— 那条路永远不触发，
+         * 速度就恒为 0（主人 2026-10-25：「下载那一栏还是没有出现下载速度」）。
+         */
+        const pipBytes = createPipByteSampler()
         // pip 的 raw 下载进度每约 250ms 输出「Progress 当前字节 of 总字节」。
         // 子进程 stdout 可能把一行拆成多个 chunk，因此保留未完成行再解析。
         let pipRawBuffer = ''
@@ -3387,6 +3415,13 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
         let lastStage = ''
         const emitPip = (force = false): void => {
           const t = pip.now()
+          /*
+           * 两路速度取大的：raw Progress 行（大文件时才出现）与
+           * Downloading 行累计（小 wheel 也覆盖）。任一有值就说明在动。
+           */
+          const sampled = pipBytes.snapshot()
+          const effectiveBps = Math.max(pipBytesPerSec, sampled.bytesPerSec)
+          const effectiveBytes = Math.max(pipCurrentBytes, sampled.bytes)
           const now = Date.now()
           if (!force && t.stage === lastStage && now - lastEmitAt < 120) return
           lastStage = t.stage
@@ -3394,22 +3429,27 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
           sendDownloadProgress({
             type: p.type,
             tag: pick.tag,
-            got: pipCurrentBytes,
+            got: effectiveBytes,
             total: pipTotalBytes || undefined,
             percent: t.percent,
-            bytesPerSec: pipBytesPerSec,
+            bytesPerSec: effectiveBps,
             gotText: (t.stage === 'deps'
               ? `解析/下载依赖 · 已发现 ${t.packages} 个`
               : t.stage === 'install' ? `写入依赖文件 · 已发现 ${t.packages} 个` : '配置运行时')
               + (pipTotalBytes ? ` · 当前包 ${humanSize(pipCurrentBytes)} / ${humanSize(pipTotalBytes)}` : ''),
-            // speedText 保留"当前包名"：这是用户唯一能看到的"在动"的证据
-
-            speedText: (t.package ? t.package.slice(0, 28) : (t.stage === 'deps' ? '正在解析依赖' : '正在安装'))
-              + (pipBytesPerSec > 0
+            /*
+             * 速度放最前（主人 2026-10-25：「我下载显示的速度为什么给我删了」）。
+             * 包名退到后面：它只说明"在装哪个包"，用户第一眼要看的是速度。
+             */
+            speedText:
+              (effectiveBps > 0
                 ? pipSourceMode === 'cache'
-                  ? ` · 缓存读取 ${humanSize(pipBytesPerSec)}/秒`
-                  : ` · ${((pipBytesPerSec * 8) / 1_000_000).toFixed(1)} Mbps`
-                : ''),
+                  ? `缓存读取 ${humanSize(effectiveBps)}/s`
+                  : `${humanSize(effectiveBps)}/s`
+                : '') +
+              (t.package
+                ? `${effectiveBps > 0 ? ' · ' : ''}${t.package.slice(0, 28)}`
+                : effectiveBps > 0 ? '' : (t.stage === 'deps' ? '正在解析依赖' : '正在安装')),
             done: false,
             phase: 'downloading',
             label: `AstrBot ${pick.tag}`
@@ -3466,7 +3506,8 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
         // pip 装依赖要几分钟。用异步 spawn，主进程照常响应——
         // 之前用 spawnSync 时它会堵住整个事件循环，界面就点不动了。        /*         * ★ 走可注入的执行器（`opts.runCommand` 优先，缺省是真实实现）。         *         * 加这个注入点是为了让"点哪个源就用哪个源"能被**严格验证**：         * 测试塞一个记账的假执行器，就能读到**真正传给 pip 的参数**         *（见 HandlerOpts.runCommand 的说明）。         */
 
-        const execCmd = opts.runCommand ?? run
+        const execCmd: typeof run = opts.runCommand ?? run
+        const proxyEnv = await pipProxyEnv()
         let r: Awaited<ReturnType<typeof run>>
         try {
         const pipRun = await runPipWithCacheFallback(execCmd, pyExe, ['-m', 'pip', 'install', '--progress-bar', 'raw', '--no-warn-script-location', '--disable-pip-version-check', '--target', stageDir, `astrbot==${ver}`, ...pythonSourceToPipArgs(pySrc)], {
@@ -3481,9 +3522,10 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
               signal,
               // pipEnvFor 把缓存指向 data\cache\pip-cache，否则默认写 C 盘用户目录（实测能堆到 6.8GB）
 
-              env: pipEnvFor(cfg.dataRoot, { ...process.env, PYTHONHOME: pythonDirFor(cfg.dataRoot) }),
+              env: pipEnvFor(cfg.dataRoot, { ...process.env, ...proxyEnv, PYTHONHOME: pythonDirFor(cfg.dataRoot) }),
               onData: (chunk, stream) => {
                 readPipDownloadProgress(chunk, stream)
+                pipBytes.feed(chunk)
                 pip.feed(chunk)
                 emitPip()
               }
@@ -3768,13 +3810,30 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
           )
           throw new Error('已取消 —— 这个版本不会被登记（文件已就位，重新下载会覆盖它）')
         }
-        const rec = store.register({ type: p.type, tag: pick.tag, from: pick.from })
+        /*
+         * AstrBot 的版本元数据来自 PyPI，但软件实际是经用户点的 Python 源
+         * 装进去的。源行要显示「已安装」，这里必须记**实际安装源**，
+         * 否则三个 Python 源都会被记成 PyPI 官方，另外两行永远是「下载」。
+         */
+        const rec = store.register({
+          type: p.type,
+          tag: pick.tag,
+          from: pySrc.label,
+          sourceKey: pySrc.indexUrl
+        })
         // 装完作废版本列表缓存：让「已安装」状态立刻反映到界面上
 
         invalidateVersionCache(cfg.dataRoot)
         opts.logger?.log('INFO', 'proc', `已安装 AstrBot ${pick.tag}（PyPI，用内置 Python，暂存目录安装后原子替换）`)
         sendDownloadProgress({ type: p.type, tag: pick.tag, got: 0, total: undefined, percent: 100, bytesPerSec: 0, gotText: '', speedText: '完成', done: true, phase: 'done', label: `AstrBot ${pick.tag}` })
-        return { version: versionNumOf(pick.tag), tag: pick.tag, from: pick.from, sha256: '', dir: rec.dir }
+        return {
+          version: versionNumOf(pick.tag),
+          tag: pick.tag,
+          from: pySrc.label,
+          sourceKey: pySrc.indexUrl,
+          sha256: '',
+          dir: rec.dir
+        }
         } catch (e) {
           /**
  * 收尾段失败：文件其实已经就位，但**不能让进度条悬着**。 如实报错，并说清"可能已经装上了，去列表看一眼" —— 这比 让用户对着一条不动的进度条猜要诚实得多。
@@ -3893,15 +3952,15 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
          * 那只是"优先试它"，不是"只许用它"。
          *
          *   · **`isMirrorBase`（用户点了某个镜像源）**
-         *     → `onlyBase` 锁死它 —— 尊重显式选择
-         *       （"点哪个源就用哪个源"这条有测试盯着：
+         *     → 传 `onlyBase`，先完整试它，重试耗尽后再回退其余源
+         *       （"点哪个源就先用哪个源"这条有测试盯着：
          *        tests/unit/pick-source-real.spec.ts，不能动）
          *
          *   · **否则（没点，用配置首选）**
          *     → **不传 onlyBase** —— 让 `mirrorOrderFor` 把首选源排最前、
          *       其余源做回退。首选源暂时缺文件或挂了，就自动落到下一个。
          *
-         * 这既保住"用户显式选择"的语义，又让多源回退真正生效 ——
+         * 这既保住"用户显式选择优先"的语义，又让多源回退真正生效 ——
          * 那正是"配了好几个源"的意义。
          */
         const dl = await downloadRuntime({
@@ -3964,13 +4023,39 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
             `NapCat ${pick.tag} 启动参数修补：${fix.reason}`
           )
         }
-        const rec = store.register({ type: p.type, tag: pick.tag, from: dl.usedLabel })
+        const rec = store.register({
+          type: p.type,
+          tag: pick.tag,
+          from: dl.usedLabel,
+          sourceKey: dl.usedBase
+        })
+        /*
+         * ★ 点选的源没成、实际从别的源下来时，必须留一条 WARN。
+         *
+         * 回退是对的（否则 GitHub 直连一挂就永远下不完），但"用户点 A、
+         * 文件来自 B"这件事不能在日志里被下一行的"已安装（来源 B）"轻轻带过 ——
+         * 事后查"为什么这次快/慢""文件到底从哪来的"要靠这条。
+         */
+        if (isMirrorBase && p.base !== dl.usedBase) {
+          opts.logger?.log(
+            'WARN',
+            'proc',
+            `NapCat ${pick.tag}：点选的源（${p.base || 'GitHub 直连'}）没下成，回退用了 ${dl.usedLabel}`
+          )
+        }
         // 装完作废版本列表缓存，界面上的「已安装」立刻是对的
 
         invalidateVersionCache(cfg.dataRoot)
         opts.logger?.log('INFO', 'proc', `已安装 ${p.type === 'a' ? 'AstrBot' : 'NapCat'} ${pick.tag}（来源 ${dl.usedLabel}）`)
         sendDownloadProgress({ type: p.type, tag: pick.tag, got: dl.bytes, total: dl.bytes, percent: 100, bytesPerSec: 0, gotText: humanSize(dl.bytes), speedText: '完成', done: true, phase: 'done', label: pick.tag })
-        return { version: versionNumOf(pick.tag), tag: pick.tag, from: dl.usedLabel, sha256: dl.sha256, dir: rec.dir }
+        return {
+          version: versionNumOf(pick.tag),
+          tag: pick.tag,
+          from: dl.usedLabel,
+          sourceKey: dl.usedBase,
+          sha256: dl.sha256,
+          dir: rec.dir
+        }
       } catch (e) {
         sendDownloadProgress({ type: p.type, tag: pick.tag, got: 0, total: undefined, percent: null, bytesPerSec: 0, gotText: '0 B', speedText: '', done: false, phase: 'error', error: String(e instanceof Error ? e.message : e), label: pick.tag })
         throw e
@@ -4964,19 +5049,29 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
         // 全程异步：pip 引导与构建工具安装都要几十秒，同步会卡住整个界面
         // 环境里带 pipEnvFor：缓存与临时目录都指向 data，不写 C 盘
 
+        const proxyEnv = await pipProxyEnv()
         const runPy = (args: string[], o?: { signal?: AbortSignal }) =>
           run(exe, args, {
             timeoutMs: 600000,
-            env: pipEnvFor(cfg.dataRoot, { ...process.env, PYTHONHOME: dir }),
+            env: pipEnvFor(cfg.dataRoot, { ...process.env, ...proxyEnv, PYTHONHOME: dir }),
             /* 取调用方传进来的（更精确），缺省用本任务的总信号 */
             signal: o?.signal ?? pySignal
           })
+        /*
+         * 引导 pip 与装构建工具都没有字节进度：只送阶段文案。
+         * percent 传 null（未知），不能传 100 —— 那会让卡片里的条看起来
+         * “已经装完”，而实际还要编译几十秒。
+         */
+        const notePyStage = (m: string): void => {
+          opts.logger?.log('INFO', 'proc', `内置 Python：${m}`)
+          sendDownloadProgress({ type: 'a', tag: `Python ${PYTHON_VERSION}`, got: dl.bytes, total: dl.bytes, percent: null, bytesPerSec: 0, gotText: humanSize(dl.bytes), speedText: m, done: false, phase: 'finish', label: `Python ${PYTHON_VERSION}` })
+        }
         await ensurePip({
           dir,
           runPython: runPy,
           /* 取消信号：pip 引导是几十秒的长活，不接它就等于按钮是死的 */
           signal: pySignal,
-          onNote: (m) => opts.logger?.log('INFO', 'proc', `内置 Python：${m}`)
+          onNote: notePyStage
         })
         // 兜底：某些机器上构建工具没装上，这里再确认一次（AstrBot 有源码依赖，必须能编译）
 
@@ -4986,7 +5081,7 @@ export function buildHandlers(opts: HandlerOpts): HandlerMap {
           // 跟随用户选的 Python 源（不传会用默认源）
 
           pipArgs: pythonSourceToPipArgs(resolvePythonSource(cfg.dataRoot)),
-          onNote: (m) => opts.logger?.log('INFO', 'proc', `内置 Python：${m}`)
+          onNote: notePyStage
         })
         opts.logger?.log('INFO', 'proc', `内置 Python ${PYTHON_VERSION} 就绪 → ${dir}`)
         sendDownloadProgress({ type: 'a', tag: `Python ${PYTHON_VERSION}`, got: dl.bytes, total: dl.bytes, percent: 100, bytesPerSec: 0, gotText: humanSize(dl.bytes), speedText: '完成', done: true, phase: 'done', label: `Python ${PYTHON_VERSION}` })
@@ -5170,6 +5265,7 @@ export async function registerIpcHandlersReal(extra: {
 
   elevateVerdict?: string} = {}) {
   const { ipcMain, app } = await import('electron')
+  await applySystemProxy()
   const pm = createProcessManager()
   const dataRoot0 = await defaultDataRoot()
   /**
@@ -5468,12 +5564,12 @@ export async function registerIpcHandlersReal(extra: {
  */
 
     fetchUpdateManifest: async (url) => {
-      const r = await fetch(url, { signal: AbortSignal.timeout(10000) })
+      const r = await systemFetch(url, { signal: AbortSignal.timeout(10000) })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       return await r.text()
     },
     fetchUpdateToFile: async (url, outPath, onProgress) => {
-      const res = await fetch(url, { signal: AbortSignal.timeout(30 * 60 * 1000) })
+      const res = await systemFetch(url, { signal: AbortSignal.timeout(30 * 60 * 1000) })
       if (!res.ok) throw new Error(`下载失败：HTTP ${res.status}`)
       const total = Number(res.headers.get('content-length') ?? 0) || undefined
       const { createWriteStream } = await import('fs')
@@ -6042,9 +6138,18 @@ async function installAstrbotDeps(deps: {
  */
 
     const pyDir = pythonDirFor(deps.dataRoot)
+    const proxyEnv = await pipProxyEnv()
     try {
       await ensureBuildTools({
-        runPython: (a: string[]) => runCmd(deps.pythonExe, a, { timeoutMs: 600000 }),
+        runPython: (a: string[]) =>
+          runCmd(deps.pythonExe, a, {
+            timeoutMs: 600000,
+            env: pipEnvFor(deps.dataRoot, {
+              ...process.env,
+              ...proxyEnv,
+              PYTHONHOME: pyDir
+            })
+          }),
         pipArgs: pythonSourceToPipArgs(src),
         onNote: () => undefined
       })
@@ -6084,6 +6189,7 @@ async function installAstrbotDeps(deps: {
       signal: deps.signal,
       env: pipEnvFor(deps.dataRoot, {
         ...process.env,
+        ...proxyEnv,
         PYTHONHOME: pythonDirFor(deps.dataRoot)
       }),
       /*
@@ -6217,6 +6323,7 @@ async function installPipPackage(deps: {
   deps.onStage?.(`使用 Python 源：${src.label}`)
 
   try {
+    const proxyEnv = await pipProxyEnv()
     const pipRun = await runPipWithCacheFallback(
       run,
       deps.pythonExe,
@@ -6238,6 +6345,7 @@ async function installPipPackage(deps: {
         signal: deps.signal,
         env: pipEnvFor(deps.dataRoot, {
           ...process.env,
+          ...proxyEnv,
           PYTHONHOME: pythonDirFor(deps.dataRoot)
         }),
         /* 把 pip 的输出转发出去：装依赖要几分钟，界面得显示在动 */

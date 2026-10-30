@@ -3,6 +3,7 @@ import { join } from 'path'
 import { readJsonFile } from '../util/json-file'
 import { loadMirrors, resolveFileUrl, type Mirror } from './mirror-store'
 import { TEMPLATE_SOURCES } from './template-source'
+import { systemFetch } from './network'
 
 export interface VersionItem {
   tag: string
@@ -152,7 +153,7 @@ async function defaultFetchJson(url: string): Promise<string> {
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), 15000)
   try {
-    const r = await fetch(url, { signal: ctrl.signal })
+    const r = await systemFetch(url, { signal: ctrl.signal })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     return await r.text()
   } finally {
@@ -185,8 +186,49 @@ async function fromProxySource(deps: {
   const repo = TEMPLATE_SOURCES[deps.type].repo
   const filter = TEMPLATE_SOURCES[deps.type].assetFilter
   const api = 'https://api.github.com/'
-  const url = deps.mirror.base ? `${deps.mirror.base}${api}repos/${repo}/releases?per_page=30` : `${api}repos/${repo}/releases?per_page=30`
-  const raw = await deps.fetchJson(url)
+  const rel = `repos/${repo}/releases?per_page=30`
+  const direct = `${api}${rel}`
+  /*
+   * base 要先规范化：用户自己加的镜像经常不写结尾斜杠，拼起来是
+   * `https://mirror.examplehttps://api.github.com/...` —— 必然读空。
+   * fromFilesSource 一直是这么归一化的，这里对齐。
+   */
+  const base = deps.mirror.base
+    ? deps.mirror.base.endsWith('/')
+      ? deps.mirror.base
+      : `${deps.mirror.base}/`
+    : ''
+  /*
+   * ★ 镜像列不了版本 ≠ 这个源没有版本。
+   *
+   * 所有 GitHub 代理源镜像的是**同一份上游 releases**，所以镜像这条路读不到
+   *（超时 / 403 / Cloudflare 挑战）时，改问上游 GitHub：列表照样能列出来，
+   * 而下载仍然走用户点的那个镜像（assetUrl 由 downloadRuntime 拼镜像前缀）。
+   *
+   * 界面那句「这个源上没读到版本」就是这么来的：源明明能下文件
+   *（实测 gh-proxy 35.9MB 9.6 秒下完、sha256 对上），只是列版本那次请求没成。
+   * 先问镜像、镜像不通才问上游 —— 顺序反过来的话，用户点哪个源都得先等
+   * 直连（国内常常更慢），而且要多打一次 GitHub 的 60 次/小时限流。
+   */
+  const tries = base ? [`${base}${api}${rel}`, direct] : [direct]
+  let raw: string | undefined
+  let lastErr: unknown
+  for (const url of tries) {
+    try {
+      raw = await deps.fetchJson(url)
+      break
+    } catch (e) {
+      lastErr = e
+      if (base && url !== direct) {
+        console.warn(
+          `[versions] ${deps.mirror.label} 列版本失败，改问上游 GitHub：${e instanceof Error ? e.message : String(e)}`
+        )
+      }
+    }
+  }
+  if (raw === undefined) {
+    throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
+  }
   const list = JSON.parse(raw) as GhRelease[]
   const out: VersionItem[] = []
   for (const rel of list) {

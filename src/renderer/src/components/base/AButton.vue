@@ -58,7 +58,7 @@ function handleClick(e: MouseEvent): void {
   gap: 6px;
   border-radius: var(--radius-ctrl);
   font-family: inherit;
-  font-weight: 500;
+  font-weight:var(--fw-medium);
   line-height: 1;
   cursor: pointer;
   transition: all 0.14s ease;
@@ -91,7 +91,7 @@ function handleClick(e: MouseEvent): void {
   border: none;
   background: var(--primary);
   color: #fff;
-  font-weight: 600;
+  font-weight: var(--fw-medium);
 }
 .a-button--main:hover:not(:disabled) {
   background: var(--primary-deep);

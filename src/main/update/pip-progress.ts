@@ -51,6 +51,95 @@ export interface PipProgress {
   now(): PipTick
 }
 
+export interface PipByteSnapshot {
+  /** 已获取字节累计（含缓存命中） */
+  bytes: number
+  /** 平滑后的速率（字节/秒） */
+  bytesPerSec: number
+}
+
+export interface PipByteSampler {
+  /** 喂一段 pip 输出（多行也行） */
+  feed(chunk: string): PipByteSnapshot
+  snapshot(): PipByteSnapshot
+}
+
+/**
+ * 从 pip 的 "Downloading xxx.whl (207 kB)" / "Using cached ... (69 kB)" 行
+ * 累计字节并算速率。
+ *
+ * 为什么不用 pip 的 `Progress N of M`：那是 `--progress-bar raw` 的输出，
+ * 而 pip 只在**单个文件 > 512KB** 时才打（见 pip/_internal/network/download.py）。
+ * AstrBot 的依赖绝大多数 wheel 小于这个阈值，所以那条路径实际上永远不触发，
+ * 速度就一直为 0 —— 用户看到的就是"只有包名、没有速度"。
+ */
+export function createPipByteSampler(deps: { now?: () => number; smooth?: number } = {}): PipByteSampler {
+  const now = deps.now ?? (() => Date.now())
+  const alpha = deps.smooth ?? 0.35
+  let bytes = 0
+  let speed = 0
+  let lastAt = 0
+  let lastBytes = 0
+  /* pip 的输出可能把一行拆成多段；只解析完整行 */
+  let tail = ''
+  const seen = new Set<string>()
+
+  const parseSize = (unit: string, num: string): number => {
+    const n = Number(num)
+    if (!Number.isFinite(n)) return 0
+    switch (unit.toLowerCase()) {
+      case 'gb': return n * 1024 ** 3
+      case 'mb': return n * 1024 ** 2
+      case 'kb': return n * 1024
+      default: return n
+    }
+  }
+
+  const sample = (): void => {
+    const at = now()
+    if (!lastAt) {
+      lastAt = at
+      lastBytes = bytes
+      return
+    }
+    if (at > lastAt) {
+      if (bytes > lastBytes) {
+        const inst = ((bytes - lastBytes) * 1000) / (at - lastAt)
+        speed = speed > 0 ? speed * (1 - alpha) + inst * alpha : inst
+      } else if (at - lastAt > 2000) {
+        /* 两秒没涨过字节 = 停了，继续报旧速度会让用户以为还在下 */
+        speed = 0
+      }
+      lastAt = at
+      lastBytes = bytes
+    }
+  }
+
+  return {
+    feed(chunk: string): PipByteSnapshot {
+      const lines = (tail + String(chunk)).split(/\r?\n/)
+      tail = lines.pop() ?? ''
+      for (const line of lines) {
+        /* 只认"拿到了一个文件"的行；Collecting 只是解析依赖，不含大小 */
+        const m = /(?:Downloading|Using cached)\s+([^\s(]+)(?:\s+\(([\d.]+)\s*([kKmMgG]?[bB])\))?/.exec(line)
+        if (!m) continue
+        /* pip 重试会把同一行再打一次：按文件身份去重，否则字节翻倍 */
+        const id = m[1]
+        if (seen.has(id)) continue
+        seen.add(id)
+        if (m[2] && m[3]) bytes += parseSize(m[3], m[2])
+        sample()
+      }
+      return { bytes, bytesPerSec: Math.max(0, Math.round(speed)) }
+    },
+    snapshot(): PipByteSnapshot {
+      /* 快照也要结算一次：速度是"这段时间涨了多少"，不结算就永远停在上次 feed */
+      sample()
+      return { bytes, bytesPerSec: Math.max(0, Math.round(speed)) }
+    }
+  }
+}
+
 export function createPipProgress(): PipProgress {
   let percent = 5 // 一开始就离开 0：让进度条立刻有存在感（阶段1 依赖检查）
   let stage: PipStage = 'deps'

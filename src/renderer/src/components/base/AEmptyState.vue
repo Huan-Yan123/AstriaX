@@ -45,7 +45,7 @@ defineProps<EmptyStateProps>()
 .empty-state__title {
   margin: 0 0 8px;
   font-size: 16px;
-  font-weight: 600;
+  font-weight: var(--fw-bold);
   color: var(--ink);
 }
 

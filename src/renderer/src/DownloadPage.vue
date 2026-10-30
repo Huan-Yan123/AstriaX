@@ -47,15 +47,21 @@ interface RuntimeVersion {
   type: 'a' | 'n'
   tag: string
   from?: string
+  /** 稳定来源键：Python 源为 indexUrl，GitHub 源为 base；旧记录可能没有 */
+  sourceKey?: string
   installedAt: string
   sizeMB?: number
 }
 interface Progress {
   type: 'a' | 'n'
   tag: string
+  got?: number
+  total?: number
   percent: number | null
+  bytesPerSec?: number
   gotText: string
   speedText: string
+  done?: boolean
   phase: 'start' | 'downloading' | 'verify' | 'finish' | 'unpack' | 'done' | 'error'
   label?: string
   error?: string
@@ -81,8 +87,18 @@ interface LauncherApi {
       Array<{ base: string; label: string; ms: number | null; status: string; reason?: string }>
     >
   }
-  versions?: { list?: (p: { type: 'a' | 'n'; base?: string }) => Promise<VersionItem[]> }
-  runtime?: { install?: (p: { type: 'a' | 'n'; tag: string; base?: string }) => Promise<{ tag: string; from: string }> }
+  versions?: {
+    list?: (p: {
+      type: 'a' | 'n'
+      base?: string
+      noCache?: boolean
+    }) => Promise<VersionItem[]>
+  }
+  runtime?: {
+    install?: (
+      p: { type: 'a' | 'n'; tag: string; base?: string }
+    ) => Promise<{ tag: string; from: string; sourceKey?: string }>
+  }
   runtimes?: {
     list?: () => Promise<RuntimeVersion[]>
     /**
@@ -145,7 +161,53 @@ const py = ref<{ ready: boolean; version: string } | null>(null)
  * 看着就像「只显示一个在下载」。
  */
 const progressMap = ref<Map<string, Progress>>(new Map())
-const progressList = computed(() => [...progressMap.value.values()])
+/** 内置 Python 的进度事件 tag（主进程就用 `Python <版本>` 这个键） */
+/* 版本还没读到时给空键：不要拿写死的版本号去猜主进程的任务名 */
+const pyTag = computed(() => (py.value?.version ? `Python ${py.value.version}` : ''))
+/** 环境卡片里那条进度条的数据源；没开始装时为 null */
+const pyProgress = computed<Progress | null>(
+  () => progressMap.value.get(`a|${pyTag.value}`) ?? null
+)
+/**
+ * 是否显示卡片内进度条。
+ *
+ * 不能只看 pyBusy：它是本组件自己的 ref，切走页面再回来就没了；
+ * 而主进程还在装。挂载时 downloadSessions 会恢复进度快照，
+ * 所以「有活跃进度」同样算安装中。
+ */
+const pyInstalling = computed(
+  () =>
+    pyBusy.value ||
+    (pyProgress.value !== null &&
+      pyProgress.value.phase !== 'done' &&
+      pyProgress.value.phase !== 'error')
+)
+/** 某个版本是不是正在下载：本组件刚点过，或切页后恢复了活跃进度 */
+function rowDownloading(type: 'a' | 'n', tag: string): boolean {
+  const p = progressMap.value.get(`${type}|${tag}`)
+  return busyKeys.value.has(`${type}|${tag}`) ||
+    (p !== undefined && p.phase !== 'done' && p.phase !== 'error')
+}
+/**
+ * 当前弹窗里真正可见的行内进度。
+ *
+ * 不能只凭“点过下载”就永久把任务藏进版本行：弹窗关闭、切页回来、
+ * 或用户打开的是别的版本列表时，那一行并不在 DOM 里。
+ */
+const visibleInlineKeys = computed(() => {
+  const keys = new Set<string>()
+  if (!picking.value) return keys
+  for (const v of versions.value) {
+    if (rowDownloading(pickType.value, v.tag)) keys.add(`${pickType.value}|${v.tag}`)
+  }
+  return keys
+})
+/* Python 的进度画在运行环境卡片里，顶部条里不再重复列一份 */
+const progressList = computed(() =>
+  [...progressMap.value.values()].filter(
+    (p) => p.tag !== pyTag.value && !visibleInlineKeys.value.has(`${p.type}|${p.tag}`)
+  )
+)
 
 /*
  * ★ "看起来卡死"的保护（指导书 7.3(5)）
@@ -289,7 +351,10 @@ async function cancelTask(p: Progress): Promise<void> {
       error: '已取消 —— 你可以换个更快的源重新下载'
     })
     progressMap.value = next
-    cancelling.value = new Set()
+    /* 只清自己这一条：另一个还在取消中的任务不能被顺手解除标记 */
+    const nx = new Set(cancelling.value)
+    nx.delete(key)
+    cancelling.value = nx
     scheduleClear(key, 6000)
   } catch {
     const next = new Set(cancelling.value)
@@ -401,8 +466,9 @@ const pyBusy = ref(false)
 function keyOf(type: 'a' | 'n', tag: string): string {
   return `${type}|${tag}`
 }
-function isBusy(type: 'a' | 'n', tag: string): boolean {
-  return busyKeys.value.has(keyOf(type, tag))
+/** 某个版本行当前的进度（没有在下载时为 undefined） */
+function rowProgress(type: 'a' | 'n', tag: string): Progress | undefined {
+  return progressMap.value.get(`${type}|${tag}`)
 }
 function markBusy(type: 'a' | 'n', tag: string, on: boolean): void {
   const next = new Set(busyKeys.value)
@@ -469,6 +535,189 @@ const pySources = ref<{ sources: PySourceItem[]; pref: string; active?: PySource
 const pyActive = ref('')
 
 /**
+ * 每类运行时最新的稳定版本。
+ *
+ * 同一分区的源都镜像同一份上游版本，所以每类只查一次；主进程已有
+ * 15 分钟磁盘缓存，不会因为画源行而反复打网络。
+ */
+const sourceLatest = ref<Map<string, string>>(new Map())
+/** 按源记录的最新稳定版（NapCat 专用；AstrBot 仍然整类查 PyPI） */
+const sourceLatestByKey = ref<Map<string, Map<string, string>>>(new Map())
+
+/** 判断版本新旧（渲染层拿不到主进程的 cmpVersion） */
+function cmpVersionTag(x: string, y: string): number {
+  const norm = (s: string): number[] =>
+    s
+      .replace(/^v/i, '')
+      .split(/[.\-+]/)
+      .map((p) => Number.parseInt(p, 10))
+      .map((n) => (Number.isFinite(n) ? n : 0))
+  const a = norm(x)
+  const b = norm(y)
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] ?? 0) - (b[i] ?? 0)
+    if (d !== 0) return d
+  }
+  return 0
+}
+
+function latestStable(items: VersionItem[]): string | undefined {
+  return items.filter((v) => !v.prerelease).map((v) => v.tag).sort((a, b) => cmpVersionTag(b, a))[0]
+}
+
+/**
+ * 源行状态：
+ *   download —— 没装
+ *   installed —— 该源就是实际安装来源，且已是最新
+ *   update —— 同类型已有旧版
+ *   blocked —— 同类型已有实际安装源，其它源保持「下载」但灰禁
+ */
+interface SourceAction {
+  state: 'download' | 'installed' | 'update' | 'blocked'
+  tag?: string
+}
+
+function isOriginSource(row: RuntimeVersion, type: 'a' | 'n', key: string): boolean {
+  if (row.sourceKey) return row.sourceKey === key
+  const label =
+    type === 'a'
+      ? pySources.value.sources.find((s) => s.indexUrl === key)?.label
+      : githubMirrors.value.find((m) => m.base === key)?.label
+  return !!label && row.from === label
+}
+
+function installedRowOf(type: 'a' | 'n'): RuntimeVersion | undefined {
+  return runtimes.value
+    .filter((r) => r.type === type)
+    .sort((a, b) => cmpVersionTag(b.tag, a.tag))[0]
+}
+
+/**
+ * 已装版本的来源，在当前源列表里还找得到对应行吗？
+ *
+ * 找不到的两种情况都很常见：用户删掉了自己加的那个源；或者换版本之后
+ * 内置源的地址变了（老记录的 sourceKey 就指向一个不存在的 base）。
+ * 旧记录只有 from（标签），所以按标签兜底匹配。
+ */
+function originRowExists(type: 'a' | 'n', row: RuntimeVersion): boolean {
+  if (type === 'a') {
+    const list = pySources.value.sources
+    return row.sourceKey
+      ? list.some((s) => s.indexUrl === row.sourceKey)
+      : !!row.from && list.some((s) => s.label === row.from)
+  }
+  const list = githubMirrors.value
+  return row.sourceKey
+    ? list.some((m) => m.base === row.sourceKey)
+    : !!row.from && list.some((m) => m.label === row.from)
+}
+
+function sourceAction(type: 'a' | 'n', key: string): SourceAction {
+  const installedRow = installedRowOf(type)
+  if (!installedRow) return { state: 'download' }
+  const installed = installedRow.tag
+  if (!isOriginSource(installedRow, type, key)) {
+    /*
+     * ★ 来源行已经不在列表里时**不能灰禁整页**。
+     *
+     * 灰禁 = 按钮 disabled = `openPick` 进不去 = 版本弹窗打不开 ——
+     * 而「卸载」入口就在那个弹窗里。用户删掉自己装过的那个源之后，
+     * 整页每个源都灰，卸载和换源一起没了，只能去翻实例卡片。
+     * 所以只有"来源行还在、用户想换源"这一种情况才灰。
+     */
+    if (!originRowExists(type, installedRow)) return { state: 'download' }
+    return { state: 'blocked', tag: installed }
+  }
+  const latest =
+    type === 'a'
+      ? sourceLatest.value.get('a')
+      : sourceLatestByKey.value.get('n')?.get(key)
+  if (latest && cmpVersionTag(latest, installed) > 0) return { state: 'update', tag: installed }
+  return { state: 'installed', tag: installed }
+}
+
+function sourceBtnText(type: 'a' | 'n', key: string): string {
+  const state = sourceAction(type, key).state
+  return state === 'installed'
+    ? '已安装'
+    : state === 'update'
+      ? '更新'
+    : '下载'
+}
+
+function sourceBtnTitle(type: 'a' | 'n', key: string, down: string, h?: { status: string }): string {
+  const action = sourceAction(type, key)
+  if (action.state === 'installed' || action.state === 'update') {
+    const title =
+      action.state === 'installed'
+        ? `已安装 ${action.tag}`
+        : `已安装 ${action.tag}，有新版本可更新`
+    return isSourceDown(h)
+      ? `${title}；来源当前不可用，但仍可查看/卸载已安装版本`
+      : title
+  }
+  if (action.state === 'blocked') return `已安装 ${action.tag}，请先卸载后再切换来源`
+  return down
+}
+
+/**
+ * 拉源行版本。
+ *
+ * AstrBot 的版本元数据只在 PyPI，因此整类查一次；NapCat 的每个 GitHub 源
+ * 可以有自己的清单，必须带 base 分别查，否则“另一个源有新版本”会让当前源
+ * 误显示「更新」，点进去又看不到那个版本。
+ */
+async function loadSourceVersions(): Promise<void> {
+  if (!runtimes.value.length) {
+    sourceLatest.value = new Map()
+    sourceLatestByKey.value = new Map()
+    return
+  }
+  const next = new Map<string, string>()
+  const byKey = new Map<string, Map<string, string>>()
+  const jobs: Array<Promise<void>> = []
+  if (runtimes.value.some((r) => r.type === 'a')) {
+    jobs.push(
+      (async () => {
+        try {
+          const rows = (await api().versions?.list?.({ type: 'a', base: '' })) ?? []
+          const latest = latestStable(rows)
+          if (latest) next.set('a', latest)
+        } catch {
+          /* 版本查不到就按“已安装”降级显示 */
+        }
+      })()
+    )
+  }
+  if (runtimes.value.some((r) => r.type === 'n')) {
+    const n = new Map<string, string>()
+    for (const m of githubMirrors.value) {
+      jobs.push(
+        (async () => {
+          try {
+            const rows = (await api().versions?.list?.({ type: 'n', base: m.base })) ?? []
+            const latest = latestStable(rows)
+            if (latest) n.set(m.base, latest)
+          } catch {
+            /* 单个源查不到不代表其它源也查不到 */
+          }
+        })()
+      )
+    }
+    byKey.set('n', n)
+  }
+  await Promise.all(jobs)
+  sourceLatest.value = next
+  sourceLatestByKey.value = byKey
+}
+
+watch(
+  () => runtimes.value.map((r) => `${r.type}|${r.tag}`).join(','),
+  () => void loadSourceVersions(),
+  { immediate: true }
+)
+
+/**
  * Python 源的实测延迟（与 `mirrorHealth` 对称）。
  *
  * 主人 2026-09-27：「加入和 github 一样的测通断」。
@@ -477,9 +726,18 @@ const pyActive = ref('')
 const pyHealth = ref<Map<string, { status: string; ms: number | null; reason?: string }>>(
   new Map()
 )
+/**
+ * Python 源探测是否正在进行。
+ *
+ * 为什么需要：探测要 0.2~5 秒（PyPI 官方实测 1.5 秒，偶尔更久）。
+ * 没有这个标志时，那一栏在探测期间是**完全空白** —— 用户看到三个源
+ * 都没有徽章，会以为"这个功能坏了"（2026-10-25 截图即如此）。
+ */
+const pyHealthPending = ref(false)
 
 /** 探测所有 Python 源的通断与延迟（与 probeMirrors 同一形态） */
 async function probePySources(): Promise<void> {
+  pyHealthPending.value = true
   try {
     const l = window as unknown as {
       launcher?: {
@@ -494,6 +752,8 @@ async function probePySources(): Promise<void> {
     pyHealth.value = m
   } catch {
     /* 探测失败就当没测过，不打扰用户（与 GitHub 源一致） */
+  } finally {
+    pyHealthPending.value = false
   }
 }
 
@@ -667,7 +927,12 @@ function pythonReady(): boolean {
   return py.value?.ready === true
 }
 
-function openPickByBase(type: 'a' | 'n', indexUrl: string): void {
+async function openPickByBase(type: 'a' | 'n', indexUrl: string): Promise<void> {
+  const src = pySources.value.sources.find((s) => s.indexUrl === indexUrl)
+  const action = sourceAction(type, indexUrl)
+  if (action.state === 'blocked') {
+    return
+  }
   /*
    * ══════════════════════════════════════════════════════════════════════════
    * ★ base 与 indexUrl 的分工（主人 2026-09-27 严格验证后理清）
@@ -698,7 +963,6 @@ function openPickByBase(type: 'a' | 'n', indexUrl: string): void {
    * 这与"点哪个源就用哪个源"是同一个要求的两面：
    * **界面上显示的、用户点的、实际会用的，三者必须一致。**
    */
-  const src = pySources.value.sources.find((s) => s.indexUrl === indexUrl)
   /*
    * ★ Python 前置检查（主人 2026-10-08）
    *
@@ -721,7 +985,7 @@ function openPickByBase(type: 'a' | 'n', indexUrl: string): void {
     builtin: true,
     indexUrl
   } as Mirror
-  openPick(fake, type)
+  await openPick(fake, type)
 }
 const installedA = computed(() => runtimes.value.filter((r) => r.type === 'a'))
 const installedN = computed(() => runtimes.value.filter((r) => r.type === 'n'))
@@ -1122,6 +1386,16 @@ function isSourceDown(
 }
 
 /**
+ * 源健康状态是否应锁住这一行。
+ *
+ * 已安装/可更新的行仍要允许进入详情（查看、卸载）；离线只应阻止“新下载”。
+ */
+function sourceDisabled(type: 'a' | 'n', key: string, h: { status: string } | undefined): boolean {
+  const action = sourceAction(type, key)
+  return action.state === 'blocked' || (action.state === 'download' && isSourceDown(h))
+}
+
+/**
  * 下载按钮的悬浮提示 —— **把"为什么是灰的"说清楚**。
  *
  * ══════════════════════════════════════════════════════════════════════════
@@ -1238,7 +1512,11 @@ async function reload(): Promise<void> {
   }
 }
 
-function openPick(m: Mirror, type: 'a' | 'n'): void {
+async function openPick(m: Mirror, type: 'a' | 'n'): Promise<void> {
+  const action = sourceAction(type, m.indexUrl ?? m.base)
+  if (action.state === 'blocked') {
+    return
+  }
   picking.value = m
   pickType.value = type
   versions.value = []
@@ -1319,6 +1597,7 @@ async function install(v: VersionItem): Promise<void> {
     err.value = e instanceof Error ? e.message : String(e)
   } finally {
     markBusy(t, v.tag, false)
+    void loadSourceVersions()
   }
 }
 
@@ -1372,10 +1651,10 @@ async function installPythonFromDialog(): Promise<void> {
   if (!pending) return
   if (!pythonReady()) return
   needPython.value = null
-  openPickByBase(pending.type, pending.indexUrl)
+  await openPickByBase(pending.type, pending.indexUrl)
 }
 
-const delTarget = ref<{ type: 'a' | 'n'; tag: string } | null>(null)
+const delTarget = ref<{ type: 'a' | 'n'; tag: string; source?: string } | null>(null)
 
 /*
  * 点了「删除」时，先算出有哪些实例还在用这个版本，写进确认弹窗里。
@@ -1429,7 +1708,7 @@ const delRunning = computed(() => {
     .map((i) => i.name)
 })
 
-async function askRemove(type: 'a' | 'n', tag: string): Promise<void> {
+async function askRemove(type: 'a' | 'n', tag: string, source?: string): Promise<void> {
   // 每次弹确认前刷一遍实例列表，避免拿旧数据吓人或漏报
   try {
     instancesOfType.value = (await api().instance?.list?.()) ?? []
@@ -1438,7 +1717,7 @@ async function askRemove(type: 'a' | 'n', tag: string): Promise<void> {
   }
   // 上一次删除留下的提示不该跟着这一次显示
   note.value = ''
-  delTarget.value = { type, tag }
+  delTarget.value = { type, tag, source }
 }
 
 async function doRemove(): Promise<void> {
@@ -1476,7 +1755,9 @@ async function doRemove(): Promise<void> {
     } else {
       note.value = ''
     }
+    sourceLatest.value = new Map()
     await reload()
+    await loadSourceVersions()
     if (picking.value) await loadVersions()
   } catch (e) {
     err.value = e instanceof Error ? e.message : String(e)
@@ -1943,15 +2224,34 @@ onUnmounted(() => {
             <div class="environment-cell"><span>处理器</span><b :title="environment?.cpu">{{ environment?.cpu ?? '检测中…' }}</b></div>
             <div class="environment-cell"><span>显卡</span><b :title="environment?.gpu">{{ environment?.gpu ?? '检测中…' }}</b></div>
             <div class="environment-cell"><span>内存</span><b>{{ environment ? `${environment.memoryUsed} / ${environment.memory}` : '检测中…' }} <small>可用 {{ environment?.memoryFree ?? '—' }}</small></b></div>
-            <div class="environment-cell"><span>Python</span><b class="env-stack"><i :class="{ good: py?.ready }" />{{ environment?.python ?? '检测中…' }}</b><button v-if="!py?.ready" class="row-action primary env-action" :disabled="pyBusy" @click="installPython">{{ pyBusy ? '安装中' : '安装' }}</button></div>
+            <div class="environment-cell"><span>Python</span><b class="env-stack"><i :class="{ good: py?.ready }" />{{ environment?.python ?? '检测中…' }}</b>
+              <div v-if="pyInstalling" class="env-progress">
+                <div class="env-track"><div class="env-bar" :style="{ width: `${pyProgress?.percent ?? 30}%` }" /></div>
+                <div class="env-meta">
+                  <span class="env-speed">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" /></svg>
+                    {{ pyProgress?.speedText || '准备中…' }}
+                  </span>
+                  <span class="env-percent">{{ pyProgress?.percent == null ? '—' : `${Math.round(pyProgress.percent)}%` }}</span>
+                  <button
+                    v-if="pyProgress && pyProgress.phase !== 'done' && pyProgress.phase !== 'error'"
+                    class="env-cancel"
+                    type="button"
+                    :disabled="cancelling.has(`a|${pyTag}`)"
+                    @click="cancelTask(pyProgress)"
+                  >{{ cancelling.has(`a|${pyTag}`) ? '取消中' : '取消' }}</button>
+                </div>
+              </div>
+              <button v-else-if="!py?.ready" class="row-action primary env-action" @click="installPython">安装</button>
+            </div>
             <div class="environment-cell"><span>QQ</span><b class="env-stack" :title="qq?.reason"><i :class="{ good: qq?.ok }" />{{ environment?.qq ?? '未检测' }}</b><div class="env-actions"><button v-if="qq && !qq.ok" class="row-action primary env-action" @click="openQQDownload">下载 QQ</button></div></div>
           </div>
         </section>
 
         <section class="resource-section source-section">
           <div class="section-head"><div><span class="section-index">03</span><h2>下载资源</h2></div><button class="tool-btn section-action" :disabled="testing" @click="probeBoth">{{ testing ? '检测中' : '检测所有来源' }}</button></div>
-          <div class="source-block"><h3>AstrBot <small>Python 源</small></h3><div class="source-table"><div v-for="s in pySources.sources" :key="`py-${s.indexUrl}`" class="source-row"><b>{{ s.label }}</b><span class="source-url">{{ s.indexUrl }}</span><span v-if="pyHealth.get(s.indexUrl)" class="health" :class="pyHealth.get(s.indexUrl)?.status" :title="pyHealth.get(s.indexUrl)?.reason">{{ pyHealth.get(s.indexUrl)?.status === 'ok' ? `可用 ${pyHealth.get(s.indexUrl)?.ms}ms` : '不可用' }}</span><button class="row-action primary" :disabled="isSourceDown(pyHealth.get(s.indexUrl))" :title="downHint(pyHealth.get(s.indexUrl), '安装')" @click="openPickByBase('a', s.indexUrl)">下载</button><button v-if="!s.builtin" class="row-action danger" @click="removePySource(s.indexUrl)">删</button></div></div></div>
-          <div class="source-block"><h3>NapCat <small>GitHub 源</small></h3><div class="source-table"><div v-for="m in githubMirrors" :key="`gh-${m.base}`" class="source-row"><b>{{ m.label }}</b><span class="source-url">{{ displayBase(m) }}</span><span v-if="mirrorHealth.get(m.base)" class="health" :class="mirrorHealth.get(m.base)?.status" :title="mirrorHealth.get(m.base)?.reason">{{ mirrorHealth.get(m.base)?.status === 'ok' ? `可用 ${mirrorHealth.get(m.base)?.ms}ms` : '不可用' }}</span><button class="row-action primary" :disabled="isSourceDown(mirrorHealth.get(m.base))" :title="downHint(mirrorHealth.get(m.base), '下载')" @click="openPick(m, 'n')">下载</button><button v-if="!m.builtin" class="row-action danger" @click="removeMirror(m.base)">删</button></div></div></div>
+          <div class="source-block"><h3>AstrBot <small>Python 源</small></h3><div class="source-table"><div v-for="s in pySources.sources" :key="`py-${s.indexUrl}`" class="source-row"><b>{{ s.label }}</b><span class="source-url">{{ s.indexUrl }}</span><span class="health-slot"><span v-if="pyHealth.get(s.indexUrl)" class="health" :class="pyHealth.get(s.indexUrl)?.status" :title="pyHealth.get(s.indexUrl)?.reason">{{ pyHealth.get(s.indexUrl)?.status === 'ok' ? `可用 ${pyHealth.get(s.indexUrl)?.ms}ms` : '不可用' }}</span><span v-else-if="pyHealthPending" class="health pending">检测中…</span></span><button :class="['row-action source-action', sourceAction('a', s.indexUrl).state]" :disabled="sourceDisabled('a', s.indexUrl, pyHealth.get(s.indexUrl))" :title="sourceBtnTitle('a', s.indexUrl, downHint(pyHealth.get(s.indexUrl), '安装'), pyHealth.get(s.indexUrl))" @click="openPickByBase('a', s.indexUrl)">{{ sourceBtnText('a', s.indexUrl) }}</button><span class="danger-slot"><button v-if="!s.builtin" class="row-action danger" @click="removePySource(s.indexUrl)">删</button></span></div></div></div>
+          <div class="source-block"><h3>NapCat <small>GitHub 源</small></h3><div class="source-table"><div v-for="m in githubMirrors" :key="`gh-${m.base}`" class="source-row"><b>{{ m.label }}</b><span class="source-url">{{ displayBase(m) }}</span><span class="health-slot"><span v-if="mirrorHealth.get(m.base)" class="health" :class="mirrorHealth.get(m.base)?.status" :title="mirrorHealth.get(m.base)?.reason">{{ mirrorHealth.get(m.base)?.status === 'ok' ? `可用 ${mirrorHealth.get(m.base)?.ms}ms` : '不可用' }}</span></span><button :class="['row-action source-action', sourceAction('n', m.base).state]" :disabled="sourceDisabled('n', m.base, mirrorHealth.get(m.base))" :title="sourceBtnTitle('n', m.base, downHint(mirrorHealth.get(m.base), '下载'), mirrorHealth.get(m.base))" @click="openPick(m, 'n')">{{ sourceBtnText('n', m.base) }}</button><span class="danger-slot"><button v-if="!m.builtin" class="row-action danger" @click="removeMirror(m.base)">删</button></span></div></div></div>
           <div class="source-tools">
             <button class="tool-btn" @click="showAdd = !showAdd">{{ showAdd ? '收起' : '添加 GitHub 源' }}</button>
             <button class="tool-btn" @click="pickImport">{{ impBusy ? '处理中…' : '导入压缩包' }}</button>
@@ -2024,8 +2324,31 @@ onUnmounted(() => {
       </main>
     </div>
 
-    <Transition name="pop"><div v-if="picking" class="mask" @click.self="picking = null"><div class="dlg"><header class="dhead"><h2>{{ picking.label }}</h2><button class="tool-btn" :disabled="loadingVersions" @click="loadVersions(true)">{{ loadingVersions ? '读取中' : '刷新' }}</button><button class="x" @click="picking = null">×</button></header><p v-if="versionSourceHint" class="srcline">{{ versionSourceHint }}</p><div class="vlist"><p v-if="loadingVersions" class="none">正在读取版本列表…</p><p v-else-if="!versions.length" class="none">这个源上没读到版本</p><div v-for="v in versions" :key="v.tag" class="vitem"><div class="vinfo"><b>{{ v.tag }}</b><span v-if="v.prerelease" class="tag warn">测试版</span></div><div class="vright"><span v-if="v.publishedAt" class="meta">{{ v.publishedAt.slice(0, 10) }}</span><button v-if="isInstalled(v.tag)" class="status-chip ready" disabled>已安装</button><button v-else class="action-btn primary" :disabled="isBusy(pickType, v.tag)" @click="install(v)">{{ isBusy(pickType, v.tag) ? '下载中' : '下载' }}</button></div></div></div></div></div></Transition>
-    <Transition name="pop"><div v-if="delTarget" class="mask" @click.self="delTarget = null"><div class="dlg small"><h2>删除 {{ delTarget.type === 'a' ? 'AstrBot' : 'NapCat' }} {{ delTarget.tag }}？</h2><p class="sub">{{ delRunning.length ? `有 ${delRunning.length} 个实例正在使用，需先停止它们。` : delUsedBy.length ? `有 ${delUsedBy.length} 个实例引用此版本，删除后需要重新选择版本。` : '运行时文件将被删除。' }}</p><div class="row"><button class="tool-btn" @click="delTarget = null">取消</button><button class="action-btn danger" :disabled="delRunning.length > 0" @click="doRemove">删除</button></div></div></div></Transition>
+    <Transition name="pop"><div v-if="picking" class="mask" @click.self="picking = null"><div class="dlg"><header class="dhead"><h2>{{ picking.label }}</h2><button class="tool-btn" :disabled="loadingVersions" @click="loadVersions(true)">{{ loadingVersions ? '读取中' : '刷新' }}</button><button class="x" @click="picking = null">×</button></header><p v-if="versionSourceHint" class="srcline">{{ versionSourceHint }}</p><div class="vlist"><p v-if="loadingVersions" class="none">正在读取版本列表…</p><p v-else-if="!versions.length" class="none">没读到版本：网络不通或这个源暂时列不出清单，点上面的「刷新」再试一次</p>
+      <div v-for="v in versions" :key="v.tag" class="vitem">
+        <div class="vinfo"><b>{{ v.tag }}</b><span v-if="v.prerelease" class="tag warn">测试版</span></div>
+        <div class="vright">
+          <!-- 下载中不显示发布日期：那一栏要留给进度条，日期会挤掉速度 -->
+          <span v-if="v.publishedAt && !rowDownloading(pickType, v.tag)" class="meta">{{ v.publishedAt.slice(0, 10) }}</span>
+          <div v-if="rowDownloading(pickType, v.tag)" class="row-progress">
+            <div class="row-track"><div class="row-bar" :style="{ width: `${rowProgress(pickType, v.tag)?.percent ?? 0}%` }" /></div>
+            <div class="row-meta">
+              <span class="row-speed">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v12m0 0l-4-4m4 4l4-4M4 20h16" /></svg>
+                {{ rowProgress(pickType, v.tag)?.speedText || '准备中…' }}
+              </span>
+              <span class="row-percent">{{ rowProgress(pickType, v.tag)?.percent == null ? '—' : `${Math.round(rowProgress(pickType, v.tag)!.percent!)}%` }}</span>
+            </div>
+          </div>
+          <template v-else-if="isInstalled(v.tag)">
+            <button class="status-chip installed" disabled>已安装</button>
+            <button class="action-btn uninstall-btn" type="button" @click="askRemove(pickType, v.tag, picking?.label)">卸载</button>
+          </template>
+          <button v-else class="action-btn primary" @click="install(v)">下载</button>
+        </div>
+      </div>
+    </div></div></div></Transition>
+    <Transition name="pop"><div v-if="delTarget" class="mask" @click.self="delTarget = null"><div class="dlg small"><h2>卸载 {{ delTarget.type === 'a' ? 'AstrBot' : 'NapCat' }} {{ delTarget.tag }}？</h2><p class="sub"><template v-if="delTarget.source">当前版本：{{ delTarget.tag }}<br />来源：{{ delTarget.source }}<br /></template>{{ delRunning.length ? `有 ${delRunning.length} 个实例正在使用，需先停止它们。` : delUsedBy.length ? `有 ${delUsedBy.length} 个实例引用此版本，删除后需要重新选择版本。` : '运行时文件将被删除。' }}</p><div class="row"><button class="tool-btn" @click="delTarget = null">取消</button><button class="action-btn danger" :disabled="delRunning.length > 0" @click="doRemove">卸载</button></div></div></div></Transition>
     <Transition name="pop"><div v-if="needPython" class="mask" @click.self="needPython = null"><div class="dlg small">
       <h2>要先装 Python 呀</h2>
       <p class="sub">
@@ -2043,11 +2366,11 @@ onUnmounted(() => {
 </template><style scoped>
 .download-console { max-width: 1180px; margin: 0 auto; padding: 20px 28px 36px; color: var(--ink); }
 .console-head { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding-bottom:18px; border-bottom:1px solid var(--hairline); }
-.eyebrow { margin:0 0 7px; color:var(--primary); font-size:10px; font-weight:800; letter-spacing:.16em; }
-.console-head h1 { margin:0; font-size:25px; line-height:1; font-weight:750; letter-spacing:-.03em; }
+.eyebrow { margin:0 0 7px; color:var(--primary); font-size:12px; font-weight:var(--fw-bold); letter-spacing:.14em; }
+.console-head h1 { margin:0; font-size:25px; line-height:1; font-weight:var(--fw-bold); letter-spacing:-.03em; }
 .head-note { margin:7px 0 0; color:var(--ink-soft); font-size:12px; }
 .head-actions { display:flex; align-items:center; gap:10px; }
-.head-alert { max-width:280px; color:var(--danger); font-size:11px; }
+.head-alert { max-width:280px; color:var(--danger); font-size:12px; }
 .console-grid { display:grid; grid-template-columns:188px minmax(0,1fr); gap:34px; padding-top:22px; }
 /*
  * 左侧栏：普通块布局，项目主页卡片**紧跟**在资源项下面。
@@ -2057,13 +2380,13 @@ onUnmounted(() => {
  * 顶到底部会让卡片与资源项之间空出一大段，反而显得是两块无关的东西。
  */
 .resource-nav { border-right:1px solid var(--hairline); padding-right:20px; }
-.nav-title { margin:0 0 9px; color:var(--ink-soft); font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.nav-title { margin:0 0 9px; color:var(--ink-soft); font-size:11px; font-weight:var(--fw-bold); letter-spacing:.1em; text-transform:uppercase; }
 .resource-item { display:grid; grid-template-columns:28px 1fr auto; align-items:center; gap:8px; min-height:48px; padding:6px 8px; margin:2px 0; border-left:2px solid transparent; }
 .resource-item.active { background:var(--primary-soft); border-left-color:var(--primary); }
 .resource-item b { display:block; font-size:12px; }
-.resource-item small { display:block; margin-top:2px; color:var(--ink-soft); font-size:10px; }
+.resource-item small { display:block; margin-top:2px; color:var(--ink-soft); font-size:11px; }
 .resource-item strong { color:var(--ink-soft); font-size:12px; }
-.resource-mark { display:grid; place-items:center; width:25px; height:25px; border-radius:5px; color:#fff; font-size:12px; font-weight:800; }
+.resource-mark { display:grid; place-items:center; width:25px; height:25px; border-radius:5px; color:#fff; font-size:12px; font-weight:var(--fw-bold); }
 .astrbot-mark { background:#315da8; } .napcat-mark { background:#d06a3c; }
 .nav-rule { height:1px; margin:22px 0; background:var(--hairline); }
 /*
@@ -2076,12 +2399,12 @@ onUnmounted(() => {
  */
 .repo-note { padding:0 2px; }
 .repo-head { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
-.repo-head b { color:var(--ink); font-size:11.5px; font-weight:700; }
+.repo-head b { color:var(--ink); font-size:12px; font-weight:var(--fw-bold); }
 .repo-star { width:12px; height:12px; flex:0 0 auto; fill:var(--primary); }
-.repo-note p { margin:0; color:var(--ink-soft); font-size:10.5px; line-height:1.65; }
-.repo-note em { color:var(--primary); font-style:normal; font-weight:700; }
+.repo-note p { margin:0; color:var(--ink); font-size:11px; font-weight:var(--fw-medium); line-height:1.65; }
+.repo-note em { color:var(--primary); font-style:normal; font-weight:var(--fw-bold); }
 /* 超链：地址本身就长得像地址，所以给下划线 + 主色，一眼看出能点 */
-.repo-link { color:var(--primary); font-weight:600; text-decoration:underline; text-underline-offset:2px; word-break:break-all; cursor:pointer; }
+.repo-link { color:var(--primary); font-weight:var(--fw-medium); text-decoration:underline; text-underline-offset:2px; word-break:break-all; cursor:pointer; }
 .repo-link:hover { color:var(--ink); }
 
 /*
@@ -2102,16 +2425,16 @@ onUnmounted(() => {
  * 所以 `.flow-guide ol` 直接复用 `.feedback-guide ol` 的那套规则 ——
  * 写成一条并集选择器，避免两处各写一遍然后慢慢漂移。
  */
-.feedback-guide ol, .flow-guide ol { margin:0; padding-left:14px; color:var(--ink-soft); font-size:10.5px; line-height:1.7; }
+.feedback-guide ol, .flow-guide ol { margin:0; padding-left:14px; color:var(--ink); font-size:11px; font-weight:var(--fw-medium); line-height:1.7; }
 .feedback-guide li, .flow-guide li { margin-bottom:4px; }
 .feedback-guide li:last-child, .flow-guide li:last-child { margin-bottom:0; }
-.feedback-guide li::marker, .flow-guide li::marker { color:var(--primary); font-weight:700; }
-.feedback-guide li b, .flow-guide li b { color:var(--ink); font-weight:650; }
-.feedback-guide em, .flow-guide em { color:var(--primary); font-style:normal; font-weight:700; }
-.feedback-guide .hint { margin:7px 0 0; color:var(--ink-soft); font-size:10px; line-height:1.6; opacity:.82; }
+.feedback-guide li::marker, .flow-guide li::marker { color:var(--primary); font-weight:var(--fw-bold); }
+.feedback-guide li b, .flow-guide li b { color:var(--ink); font-weight:var(--fw-bold); }
+.feedback-guide em, .flow-guide em { color:var(--primary); font-style:normal; font-weight:var(--fw-bold); }
+.feedback-guide .hint { margin:7px 0 0; color:var(--ink-soft); font-size:11px; line-height:1.6; }
 .flow-guide { padding:0 2px; }
-.env-line { display:flex; justify-content:space-between; padding:7px 0; color:var(--ink-soft); font-size:11px; border-bottom:1px solid color-mix(in srgb, var(--hairline) 70%, transparent); }
-.env-line b { max-width:112px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--danger); font-weight:650; }
+.env-line { display:flex; justify-content:space-between; padding:7px 0; color:var(--ink-soft); font-size:12px; border-bottom:1px solid color-mix(in srgb, var(--hairline) 70%, transparent); }
+.env-line b { max-width:112px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--danger); font-weight:var(--fw-bold); }
 .env-truncate { display:block; }
 .env-line b.ready { color:var(--ribbon-run); }
 .resource-main { min-width:0; display:flex; flex-direction:column; }
@@ -2143,52 +2466,74 @@ onUnmounted(() => {
 .resource-section { padding:0 0 22px; margin:0 0 22px; border-bottom:1px solid var(--hairline); }
 .section-head { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin-bottom:12px; }
 .section-head > div { display:flex; align-items:baseline; gap:10px; }
-.section-index { color:var(--primary); font:700 10px/1 ui-monospace, SFMono-Regular, Consolas, monospace; }
-.section-head h2 { margin:0; font-size:16px; font-weight:750; letter-spacing:-.015em; }
-.section-meta { color:var(--ink-soft); font-size:11px; }
+.section-index { color:var(--primary); font:var(--fw-bold) 12px/1 var(--font); }
+.section-head h2 { margin:0; font-size:16px; font-weight:var(--fw-bold); letter-spacing:-.015em; }
+.section-meta { color:var(--ink-soft); font-size:12px; }
 .runtime-line { display:grid; grid-template-columns:34px minmax(0,1fr) auto auto; align-items:center; gap:11px; min-height:52px; padding:9px 0; }
-.runtime-icon { display:grid; place-items:center; width:32px; height:32px; border-radius:5px; background:#e7eefb; color:#315da8; font-size:11px; font-weight:800; }
-.runtime-copy b { display:block; font-size:13px; } .runtime-copy span { display:block; margin-top:3px; color:var(--ink-soft); font-size:11px; }
-.status-chip { display:inline-flex; align-items:center; min-height:22px; padding:0 8px; border-radius:4px; background:#eef1f6; color:var(--ink-soft); font-size:10px; font-weight:750; }
-.status-chip.ready { background:#e4f3ec; color:#277653; }
+.runtime-icon { display:grid; place-items:center; width:32px; height:32px; border-radius:5px; background:#e7eefb; color:#315da8; font-size:12px; font-weight:var(--fw-bold); }
+.runtime-copy b { display:block; font-size:13px; } .runtime-copy span { display:block; margin-top:3px; color:var(--ink-soft); font-size:12px; }
+.status-chip { display:inline-flex; align-items:center; min-height:28px; padding:0 11px; border:0; border-radius:4px; background:var(--primary-soft); color:var(--primary-deep); font-size:12px; font-weight:var(--fw-bold); }
+.status-chip.installed { background:#edf3ff; color:#5274ad; }
+.row-action.source-action.download,
+.row-action.source-action.update { border-color:var(--primary); background:var(--primary); color:#fff; }
+.row-action.source-action.installed { border-color:#dce7f8; background:#edf3ff; color:#5274ad; }
+.row-action.source-action.blocked { border-color:#b8c9e8; background:#9fb5da; color:#fff; opacity:1; }
+.action-btn.uninstall-btn { border-color:#d9aaa5; background:#fff; color:#a33e37; }
+.action-btn.uninstall-btn:hover { background:#fff2f1; }
 .action-btn,.tool-btn,.row-action,.cancelbtn { border:1px solid var(--hairline); cursor:pointer; font:inherit; }
-.action-btn { min-height:28px; padding:0 11px; border-radius:4px; font-size:11px; font-weight:700; }
+.action-btn { min-height:28px; padding:0 11px; border-radius:4px; font-size:12px; font-weight:var(--fw-bold); }
 .action-btn.primary,.row-action.primary { border-color:var(--primary); background:var(--primary); color:#fff; }
 .action-btn.danger,.row-action.danger { border-color:#d9aaa5; background:#fff; color:#a33e37; }
 .action-btn:disabled,.tool-btn:disabled,.row-action:disabled { cursor:not-allowed; opacity:.5; }
-.tool-btn { min-height:28px; padding:0 10px; border-radius:4px; background:#fff; color:var(--ink-soft); font-size:11px; font-weight:650; }
+.tool-btn { min-height:28px; padding:0 10px; border-radius:4px; background:#fff; color:var(--ink-soft); font-size:12px; font-weight:var(--fw-medium); }
 .tool-btn:hover:not(:disabled) { border-color:var(--primary); color:var(--primary-deep); }
 .version-table,.source-table { width:100%; }
 .table-head,.version-row,.source-row { display:grid; grid-template-columns:110px 1fr minmax(100px,1.2fr) 75px 42px; align-items:center; gap:10px; }
-.table-head { min-height:25px; color:var(--ink-soft); border-bottom:1px solid var(--hairline); font-size:10px; }
-.version-row { min-height:36px; border-bottom:1px solid color-mix(in srgb,var(--hairline) 72%,transparent); font-size:11px; }
+.table-head { min-height:25px; color:var(--ink-soft); border-bottom:1px solid var(--hairline); font-size:12px; }
+.version-row { min-height:36px; border-bottom:1px solid color-mix(in srgb,var(--hairline) 72%,transparent); font-size:12px; }
 .version-row > span:not(.product-label),.version-row > b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.product-label { display:flex; align-items:center; gap:6px; font-weight:650; }
+.product-label { display:flex; align-items:center; gap:6px; font-weight:var(--fw-medium); }
 .product-label i { width:6px; height:6px; border-radius:50%; } .astrbot-dot { background:#315da8; } .napcat-dot { background:#d06a3c; }
-.row-action { min-height:23px; padding:0 6px; border-radius:3px; font-size:10px; font-weight:700; }
-.empty-row { padding:17px 0; color:var(--ink-soft); font-size:11px; }
+.row-action { min-height:26px; padding:0 8px; border-radius:4px; font-size:12px; font-weight:var(--fw-medium); }
+.empty-row { padding:17px 0; color:var(--ink-soft); font-size:12px; }
 .env-actions { display:flex; gap:5px; margin-top:4px; }
 .env-action { align-self:flex-start; min-height:21px; }
 .env-stack { cursor:default; }
+/* 运行环境卡片的 Python 安装进度条（按 code_artifact.html 复刻） */
+.env-progress { display:flex; flex-direction:column; gap:5px; margin-top:2px; }
+.env-track { position:relative; width:100%; height:7px; overflow:hidden; background:#e4e8ee; border-radius:999px; box-shadow:inset 0 1px 2px rgba(0,0,0,.04); }
+.env-bar { position:absolute; top:0; left:0; height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,#6c88b9 0%,#7e9ac7 50%,#9cb3d8 100%); box-shadow:0 0 10px rgba(126,154,199,.35); transition:width .08s linear; }
+.env-bar::after { content:""; position:absolute; top:0; left:-100%; width:80%; height:100%; background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.5) 50%,rgba(255,255,255,0) 100%); transform:skewX(-20deg); animation:task-shimmer 1.8s infinite cubic-bezier(.4,0,.2,1); }
+.env-meta { display:flex; align-items:center; gap:6px; font-size:12px; color:#7b889b; font-variant-numeric:tabular-nums; }
+.env-speed { display:inline-flex; align-items:center; gap:4px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#5c6c84; font-weight:var(--fw-medium); }
+.env-speed svg { width:10px; height:10px; flex:0 0 auto; fill:none; stroke:#7e9ac7; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; opacity:.85; }
+.env-percent { margin-left:auto; color:#8b99ad; font-weight:var(--fw-medium); }
+.env-cancel { padding:0; border:0; background:transparent; color:#a33e37; font-size:12px; text-decoration:underline; cursor:pointer; }
+.env-cancel:disabled { color:var(--ink-soft); cursor:default; }
 
 .environment-cell { min-width:0; min-height:48px; display:flex; flex-direction:column; justify-content:center; gap:4px; padding:8px 11px; border-right:1px solid var(--hairline); border-bottom:1px solid var(--hairline); background:rgba(255,255,255,.16); }
-.environment-cell span { color:var(--ink-soft); font-size:10px; }
-.environment-cell b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-size:11px; font-weight:650; }
-.environment-cell b small { color:var(--ink-soft); font-size:10px; font-weight:500; }
+.environment-cell span { color:var(--ink-soft); font-size:12px; }
+.environment-cell b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink); font-size:12px; font-weight:var(--fw-medium); }
+.environment-cell b small { color:var(--ink-soft); font-size:12px; font-weight:var(--fw-regular); }
 .env-stack { display:flex; align-items:center; gap:5px; }
 .env-stack i { width:6px; height:6px; flex:0 0 auto; border-radius:50%; background:var(--danger); }
 .env-stack i.good { background:var(--ribbon-run); }
 
-.source-block h3 { display:flex; align-items:baseline; gap:9px; margin:0 0 7px; font-size:15px; line-height:1.3; font-weight:800; color:var(--ink); letter-spacing:-.01em; }
-.source-block h3 small { color:var(--ink-soft); font-size:10px; font-weight:500; letter-spacing:0; }
-.source-row { grid-template-columns:115px minmax(0,1fr) 75px 45px 24px; min-height:35px; border-bottom:1px solid color-mix(in srgb,var(--hairline) 72%,transparent); font-size:11px; }
-.source-url { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-soft); font-size:10px; }
-.health { color:var(--danger); font-size:10px; } .health.ok { color:var(--ribbon-run); }
+.source-block h3 { display:flex; align-items:baseline; gap:9px; margin:0 0 7px; font-size:15px; line-height:1.3; font-weight:var(--fw-bold); color:var(--ink); letter-spacing:-.01em; }
+.source-block h3 small { color:var(--ink-soft); font-size:11px; font-weight:var(--fw-medium); letter-spacing:0; }
+.source-row { grid-template-columns:115px minmax(0,1fr) 75px 64px 24px; min-height:35px; border-bottom:1px solid color-mix(in srgb,var(--hairline) 72%,transparent); font-size:12px; }
+.source-action { white-space:nowrap; }
+.source-url { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-soft); font-size:12px; }
+.health { color:var(--danger); font-size:12px; } .health.ok { color:var(--ribbon-run); }
+.health.pending { color:var(--ink-soft); }
+/* 槽位常驻：health 没出来时按钮不能左移，删按钮不显示时也不能空一格 */
+.health-slot { display:flex; align-items:center; min-width:0; }
+.danger-slot { display:flex; justify-content:flex-end; }
 .source-tools { display:flex; gap:7px; margin-top:11px; flex-wrap:wrap; }
-.import-result { display:flex; align-items:center; gap:12px; margin-top:10px; padding:9px 11px; border:1px solid var(--hairline); border-radius:6px; background:rgba(255,255,255,.5); font-size:11px; }
-.import-result b { flex:1; min-width:0; font-weight:650; }
+.import-result { display:flex; align-items:center; gap:12px; margin-top:10px; padding:9px 11px; border:1px solid var(--hairline); border-radius:6px; background:rgba(255,255,255,.5); font-size:12px; }
+.import-result b { flex:1; min-width:0; font-weight:var(--fw-medium); }
 .import-actions { display:flex; gap:6px; flex-shrink:0; }
-.import-note { margin:8px 0 0; font-size:11px; color:var(--ink-soft); white-space:pre-line; }
+.import-note { margin:8px 0 0; font-size:12px; color:var(--ink-soft); white-space:pre-line; }
 
 /*
  * 安装 pip 库（资源页第 04 块）
@@ -2196,8 +2541,8 @@ onUnmounted(() => {
  * 与上面几个区块共用 section 的排版（.resource-section / .section-head），
  * 这里只补表单本身。
  */
-.pip-note { margin:0 0 10px; color:var(--ink-soft); font-size:11px; line-height:1.6; }
-.pip-note b { color:var(--ink); font-weight:650; }
+.pip-note { margin:0 0 10px; color:var(--ink-soft); font-size:12px; line-height:1.6; }
+.pip-note b { color:var(--ink); font-weight:var(--fw-medium); }
 .pip-note.bad, .pip-note.ok { margin-top:10px; white-space:pre-line; }
 /* 错误用统一的红，成功用项目表示"正常"的绿（与状态点同色） */
 .pip-note.bad { color:var(--ribbon-error); }
@@ -2205,20 +2550,23 @@ onUnmounted(() => {
 .pip-form { display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; }
 .pip-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .pip-field.grow { flex:1 1 260px; }
-.pip-field > span { color:var(--ink-soft); font-size:10px; font-weight:700; letter-spacing:.04em; }
+.pip-field > span { color:var(--ink-soft); font-size:12px; font-weight:var(--fw-medium); letter-spacing:.04em; }
 .pip-field select.inp { min-width:190px; }
 .pip-form .action-btn { flex:none; }
 .task-strip { margin-top:14px; padding:9px 12px; border:1px solid #cbd8ed; border-left:3px solid var(--primary); background:#f7faff; }
-.strip-label { display:flex; align-items:center; gap:6px; margin-bottom:5px; color:var(--primary-deep); font-size:10px; font-weight:800; }
+.strip-label { display:flex; align-items:center; gap:6px; margin-bottom:5px; color:var(--primary-deep); font-size:12px; font-weight:var(--fw-bold); }
 .live-dot { width:6px; height:6px; border-radius:50%; background:#2d9a70; }
-.task-row { display:grid; grid-template-columns:180px minmax(120px,1fr) minmax(100px,1.6fr) 38px 52px; align-items:center; gap:10px; min-height:30px; border-top:1px solid #e3eaf4; font-size:11px; }
-.task-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:650; } .task-state { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-soft); }
-.task-progress { height:4px; overflow:hidden; background:#dfe7f2; border-radius:2px; } .task-progress i { display:block; height:100%; background:var(--primary); }
-.task-percent { color:var(--ink-soft); font-size:10px; text-align:right; } .task-result { font-size:10px; color:var(--danger); } .task-result.done { color:var(--ribbon-run); }
-.cancelbtn { min-height:23px; padding:0 6px; border-color:#d9aaa5; border-radius:3px; background:#fff; color:#a33e37; font-size:10px; font-weight:700; }
+.task-row { display:grid; grid-template-columns:180px minmax(120px,1fr) minmax(100px,1.6fr) 38px 52px; align-items:center; gap:10px; min-height:30px; border-top:1px solid #e3eaf4; font-size:12px; }
+.task-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:var(--fw-medium); } .task-state { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink-soft); }
+.task-progress { position:relative; height:7px; overflow:hidden; background:#e4e8ee; border-radius:999px; box-shadow:inset 0 1px 2px rgba(0,0,0,.04); }
+.task-progress i { display:block; height:100%; background:linear-gradient(90deg,#6c88b9 0%,#7e9ac7 50%,#9cb3d8 100%); border-radius:999px; box-shadow:0 0 10px rgba(126,154,199,.35); position:relative; overflow:hidden; transition:width .08s linear; }
+.task-progress i::after { content:""; position:absolute; top:0; left:-100%; width:80%; height:100%; background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.5) 50%,rgba(255,255,255,0) 100%); transform:skewX(-20deg); animation:task-shimmer 1.8s infinite cubic-bezier(.4,0,.2,1); }
+@keyframes task-shimmer { 0% { left:-80%; } 100% { left:200%; } }
+.task-percent { color:var(--ink-soft); font-size:12px; text-align:right; } .task-result { font-size:12px; color:var(--danger); } .task-result.done { color:var(--ribbon-run); }
+.cancelbtn { min-height:26px; padding:0 8px; border-color:#d9aaa5; border-radius:4px; background:#fff; color:#a33e37; font-size:12px; font-weight:var(--fw-medium); }
 .cancelbtn:hover:not(:disabled) { background:#fff2f1; }
-.notice { margin:10px 0 0; padding:7px 9px; background:#f3f7fc; color:var(--ink-soft); font-size:11px; }
-.addbox { display:flex; gap:7px; margin-top:8px; } .inp { min-height:28px; padding:0 8px; border:1px solid var(--hairline); border-radius:4px; background:#fff; color:var(--ink); font-size:11px; } .inp.wide { flex:1; }
+.notice { margin:10px 0 0; padding:7px 9px; background:#f3f7fc; color:var(--ink-soft); font-size:12px; }
+.addbox { display:flex; gap:7px; margin-top:8px; } .inp { min-height:28px; padding:0 8px; border:1px solid var(--hairline); border-radius:4px; background:#fff; color:var(--ink); font-size:12px; } .inp.wide { flex:1; }
 .mask { position:fixed; inset:0; z-index:200; display:grid; place-items:center; background:rgba(19,28,43,.34); }
 .dlg { width:min(560px,calc(100vw - 36px)); max-height:75vh; display:flex; flex-direction:column; padding:18px; background:#fff; border:1px solid var(--hairline); border-radius:6px; box-shadow:0 18px 50px rgba(20,30,50,.22); }
 .dlg.small { width:min(420px,calc(100vw - 36px)); } .dhead { display:flex; align-items:center; gap:8px; margin-bottom:12px; } .dhead h2,.dlg h2 { margin:0; font-size:15px; } .dhead .x { margin-left:auto; border:0; background:transparent; color:var(--ink-soft); font-size:20px; cursor:pointer; }
@@ -2230,13 +2578,13 @@ onUnmounted(() => {
 .resource-item.active { box-shadow:inset 3px 0 0 var(--primary),0 5px 18px rgba(40,88,168,.08); transform:translateX(2px); }
 .placeholder-row { color:color-mix(in srgb,var(--ink-soft) 58%,transparent); }
 .placeholder-row .product-label { opacity:.48; }
-.table-footer { display:flex; justify-content:space-between; align-items:center; min-height:34px; color:var(--ink-soft); font-size:10px; border-top:1px solid var(--hairline); }
+.table-footer { display:flex; justify-content:space-between; align-items:center; min-height:34px; color:var(--ink-soft); font-size:12px; border-top:1px solid var(--hairline); }
 .pager { display:flex; align-items:center; gap:8px; font-variant-numeric:tabular-nums; }
 .page-btn { display:grid; place-items:center; width:24px; height:24px; padding:0; border:1px solid var(--hairline); border-radius:4px; background:#fff; color:var(--ink); cursor:pointer; font-size:16px; line-height:1; }
 .page-btn:hover:not(:disabled) { border-color:var(--primary); color:var(--primary-deep); background:var(--primary-soft); }
 .page-btn:disabled { cursor:not-allowed; opacity:.35; }
 .mask { position:fixed; inset:0; z-index:200; display:grid; place-items:center; padding:24px; background:rgba(20,30,48,.28); backdrop-filter:blur(14px) saturate(125%); -webkit-backdrop-filter:blur(14px) saturate(125%); }
-.dlg { width:min(560px,calc(100vw - 36px)); max-height:75vh; display:flex; flex-direction:column; padding:20px; background:linear-gradient(145deg,rgba(255,255,255,.82),rgba(240,247,255,.68)); border:1px solid rgba(255,255,255,.78); border-radius:16px; box-shadow:0 24px 70px rgba(16,30,55,.28),inset 0 1px 0 rgba(255,255,255,.9); backdrop-filter:blur(26px) saturate(145%); -webkit-backdrop-filter:blur(26px) saturate(145%); }
+.dlg { width:min(560px,calc(100vw - 36px)); max-height:75vh; display:flex; flex-direction:column; padding:20px; background:linear-gradient(145deg,#fff 0%,#f7faff 100%); border:1px solid var(--hairline); border-radius:16px; box-shadow:0 24px 70px rgba(16,30,55,.28),inset 0 1px 0 #fff; }
 .dlg.small { width:min(420px,calc(100vw - 36px)); }
 .dhead { display:flex; align-items:center; gap:8px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid rgba(180,195,215,.4); }
 .dhead h2,.dlg h2 { margin:0; font-size:15px; text-wrap:balance; }
@@ -2263,11 +2611,21 @@ onUnmounted(() => {
   border-color:rgba(92,139,207,.28);
 }
 .vitem .vinfo { min-width:0; display:flex; align-items:center; gap:8px; }
-.vitem .vinfo b { color:var(--ink); font-size:12.5px; font-weight:700; }
+.vitem .vinfo b { color:var(--ink); font-size:13px; font-weight:var(--fw-bold); }
 .vitem .vright { display:flex; align-items:center; gap:9px; margin-left:auto; }
-.vitem .meta { color:var(--ink-soft); font-size:10.5px; font-variant-numeric:tabular-nums; }
+.vitem .meta { color:var(--ink-soft); font-size:12px; font-variant-numeric:tabular-nums; }
 .vitem .action-btn.primary { min-width:48px; }
-.vitem .status-chip.ready { box-shadow:inset 0 0 0 1px rgba(39,118,83,.12); }
+.vitem .status-chip.installed,
+.vitem .uninstall-btn { width:48px; min-width:48px; padding:0; justify-content:center; }
+/* 版本行右侧的下载进度条（与卡片内同款外观） */
+.row-progress { width:150px; display:flex; flex-direction:column; gap:4px; }
+.row-track { position:relative; width:100%; height:7px; overflow:hidden; background:#e4e8ee; border-radius:999px; box-shadow:inset 0 1px 2px rgba(0,0,0,.04); }
+.row-bar { position:absolute; top:0; left:0; height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,#6c88b9 0%,#7e9ac7 50%,#9cb3d8 100%); box-shadow:0 0 10px rgba(126,154,199,.35); transition:width .08s linear; }
+.row-bar::after { content:""; position:absolute; top:0; left:-100%; width:80%; height:100%; background:linear-gradient(90deg,rgba(255,255,255,0) 0%,rgba(255,255,255,.5) 50%,rgba(255,255,255,0) 100%); transform:skewX(-20deg); animation:task-shimmer 1.8s infinite cubic-bezier(.4,0,.2,1); }
+.row-meta { display:flex; align-items:center; gap:6px; font-size:12px; color:#7b889b; font-variant-numeric:tabular-nums; }
+.row-speed { display:inline-flex; align-items:center; gap:4px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#5c6c84; font-weight:var(--fw-medium); }
+.row-speed svg { width:10px; height:10px; flex:0 0 auto; fill:none; stroke:#7e9ac7; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; opacity:.85; }
+.row-percent { margin-left:auto; color:#8b99ad; font-weight:var(--fw-medium); }
 .pop-enter-active,.pop-leave-active { transition:opacity .14s ease,transform .14s ease; } .pop-enter-from,.pop-leave-to { opacity:0; transform:translateY(-5px); }
-@media (max-width:800px) { .console-grid { grid-template-columns:1fr; gap:18px; } .resource-nav { display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; padding:0 0 12px; border-right:0; border-bottom:1px solid var(--hairline); } .nav-title,.nav-rule { display:none; } .env-line { display:none; } .task-row { grid-template-columns:1fr 90px 38px 52px; } .task-state { display:none; } .table-head,.version-row { grid-template-columns:90px 1fr 65px 42px; } .table-head span:nth-child(3),.version-row > span:nth-child(3) { display:none; } .source-row { grid-template-columns:90px minmax(0,1fr) 45px 24px; } .source-url { display:none; } }
+@media (max-width:800px) { .console-grid { grid-template-columns:1fr; gap:18px; } .resource-nav { display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; padding:0 0 12px; border-right:0; border-bottom:1px solid var(--hairline); } .nav-title,.nav-rule { display:none; } .env-line { display:none; } .task-row { grid-template-columns:1fr 90px 38px 52px; } .task-state { display:none; } .table-head,.version-row { grid-template-columns:90px 1fr 65px 42px; } .table-head span:nth-child(3),.version-row > span:nth-child(3) { display:none; } .source-row { grid-template-columns:90px minmax(0,1fr) 64px 24px; } .source-url { display:none; } }
 </style>

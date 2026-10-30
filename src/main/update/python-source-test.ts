@@ -38,6 +38,7 @@ import type { PythonSource } from './python-source'
  * 那时测速超时**不是源坏了**。要如实说清（见下面失败分支的说明）。
  */
 import { isDiskBusy } from '../util/workdir'
+import { systemFetch } from './network'
 
 /**
  * 探测结果的三档状态。
@@ -103,7 +104,7 @@ export async function testPythonSources(deps: {
       const ctrl = new AbortController()
       const t = setTimeout(() => ctrl.abort(), timeout)
       try {
-        const r = await fetch(url, { signal: ctrl.signal })
+        const r = await systemFetch(url, { signal: ctrl.signal })
         /*
          * 只读前 64KB —— 够判断"有没有这个包"，又不会被大页面拖慢。
          * simple 索引的单包页是纯 HTML 链接列表，通常几 KB。

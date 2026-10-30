@@ -205,8 +205,8 @@ describe('★ 取消子进程的延迟', () => {
 
     /*
      * 不传 sources → 走镜像分支。
-     * `onlyBase` 指到我们的测试服务器，候选就只剩这一个（proxy 模式
-     * 会把 base 当前缀拼到 assetUrl 上）。
+     * `onlyBase` 指到我们的测试服务器，它会先被请求（proxy 模式
+     * 会把 base 当前缀拼到 assetUrl 上）；其余源仍在回退链后面。
      */
     const dl = downloadRuntime({
       dataRoot,

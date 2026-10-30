@@ -148,7 +148,7 @@ describe('★下载页 SWR：进页面立即有内容，后台再刷新', () => 
     await delBtn!.trigger('click')
     await flushPromises()
     // 确认框里的按钮（危险色那个）
-    const confirm = w1.findAll('button').filter((b) => /删/.test(b.text())).pop()
+    const confirm = w1.findAll('.dlg button').find((b) => b.text() === '卸载')
     await confirm!.trigger('click')
     await flushPromises()
     expect(calls.remove.length, '删除应当真的调用到主进程').toBe(1)

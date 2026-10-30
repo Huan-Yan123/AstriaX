@@ -121,12 +121,10 @@ function confirm(): void {
   isolation: isolate;
   width: 430px;
   max-width: calc(100vw - 36px);
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  background: linear-gradient(145deg, #fff 0%, #f7faff 100%);
   border: 1px solid var(--glass-edge);
   border-radius: 20px;
   padding: 26px 28px 22px;
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
   box-shadow: 0 24px 64px rgba(19, 37, 70, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   overflow: hidden;
 }
@@ -156,12 +154,12 @@ function confirm(): void {
 }
 .mark {
   font-size: 15px;
-  font-weight: 700;
+  font-weight:var(--fw-bold);
   letter-spacing: 0.02em;
   color: var(--primary-deep);
 }
 .sub {
-  font-size: 11.5px;
+  font-size:12px;
   color: var(--ink-soft);
 }
 h2 {
@@ -181,7 +179,7 @@ h2 {
 }
 .body strong {
   color: var(--ink);
-  font-weight: 600;
+  font-weight: var(--fw-bold);
 }
 /*
  * 「被人倒卖」那段要有分量，但不能用报错的红色 ——
@@ -196,7 +194,7 @@ h2 {
 .sig {
   position: relative;
   margin: 14px 0 0;
-  font-size: 12.5px;
+  font-size:13px;
   color: var(--ink-soft);
   text-align: right;
 }
@@ -212,7 +210,7 @@ h2 {
 .err {
   position: relative;
   margin: 10px 0 0;
-  font-size: 12.5px;
+  font-size:13px;
   line-height: 1.6;
   color: var(--ribbon-error);
 }
@@ -230,7 +228,7 @@ h2 {
   color: #fff;
   padding: 12px 0;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: var(--fw-medium);
   font-family: inherit;
   cursor: pointer;
 }
@@ -247,11 +245,10 @@ h2 {
 .retry {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-ctrl);
-  background: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(8px);
+  background: #fff;
   color: var(--ink);
   padding: 12px 18px;
-  font-size: 13.5px;
+  font-size:14px;
   font-family: inherit;
   cursor: pointer;
 }

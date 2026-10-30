@@ -1,3 +1,15 @@
+/*
+ * 内置思源黑体（Source Han Sans CN VF，SIL OFL 1.1）。
+ * 随应用分发，避免用户机器没装字体时悄悄回退到系统 UI 字体。
+ */
+@font-face {
+  font-family: 'AstriaX Sans';
+  src: url('../assets/fonts/SourceHanSansCN-VF.ttf.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 250 900;
+  font-display: swap;
+}
+
 :root {
   /*
    * ══════════════════════════════════════════════════════════════════════
@@ -88,7 +100,10 @@
                         inset 0 1px 0 rgba(255, 255, 255, 1);
   --radius-card: 12px;
   --radius-ctrl: 8px;
-  --font: 'Segoe UI', 'MiSans', 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei UI', sans-serif;
+  --font: 'AstriaX Sans', 'Source Han Sans CN VF', '思源黑体 CN VF', sans-serif;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
   
   /* 动画参数 */
   --ease-out-smooth: cubic-bezier(0.2, 0.8, 0.3, 1);
@@ -108,6 +123,9 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font);
+  font-weight: var(--fw-regular);
+  font-optical-sizing: auto;
+  font-synthesis: none;
   line-height: 1.45;
 }
 * {
@@ -180,7 +198,7 @@ button.main {
   border: none;
   background: var(--primary);
   color: #fff;
-  font-weight: 600;
+  font-weight: var(--fw-medium);
 }
 /*
  * hover 时背景变深（--primary → --primary-deep），**白字保持不变**。
@@ -311,12 +329,10 @@ button:disabled {
 .dlg {
   position: relative;
   isolation: isolate;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
+  background: linear-gradient(145deg, #fff 0%, #f7faff 100%);
   border: 1px solid var(--glass-edge);
   border-radius: 20px;
   padding: 20px 22px 16px;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
   box-shadow: var(--glass-shadow);
   max-width: calc(100vw - 48px);
   animation: dlg-slide-up var(--duration-slow) var(--ease-out-smooth);

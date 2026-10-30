@@ -140,6 +140,84 @@ describe('版本探测：从镜像源读有哪些版本', () => {
     expect(list[0].assetUrl).toContain('github.com/NapNeko/NapCatQQ/releases/download/v4.18.19/')
   })
 
+  it('★镜像列不了版本（403/超时）→ 回退上游 GitHub，弹窗不能空着', async () => {
+    /*
+     * 用户实测：点 gh-proxy.com 打开 NapCat 版本弹窗 → 「这个源上没读到版本」，
+     * 可这个源明明下得动文件（35.9MB 9.6 秒，sha256 对得上）。
+     *
+     * 代理源列版本走的是「镜像前缀 + api.github.com」这条路，它会单独失败：
+     * cors.isteed.cc 实测对 api.github.com 回 403（Cloudflare 挑战页）。
+     * 列表读不到 ≠ 这个源没有版本 —— 所有 GitHub 代理源镜像的是同一份
+     * 上游 releases，镜像不通就该改问上游。
+     */
+    const seen: string[] = []
+    const list = await listVersions({
+      dataRoot: root,
+      type: 'n',
+      onlyBase: 'https://cors.isteed.cc/',
+      fetchJson: async (url) => {
+        seen.push(url)
+        if (url.startsWith('https://cors.isteed.cc/')) throw new Error('HTTP 403')
+        return JSON.stringify([
+          {
+            tag_name: 'v4.18.41',
+            prerelease: false,
+            assets: [
+              {
+                name: 'NapCat.Shell.zip',
+                browser_download_url:
+                  'https://github.com/NapNeko/NapCatQQ/releases/download/v4.18.41/NapCat.Shell.zip',
+                digest: 'sha256:ee55',
+                size: 35894640
+              }
+            ]
+          }
+        ])
+      }
+    })
+    expect(list.map((v) => v.tag)).toEqual(['v4.18.41'])
+    /* 列表来自上游，但「这条版本属于哪个源、下载走哪个镜像」仍是用户点的那个 */
+    expect(list[0].from).toBe('cors.isteed.cc')
+    expect(list[0].base).toBe('https://cors.isteed.cc/')
+    expect(seen[0]).toBe(
+      'https://cors.isteed.cc/https://api.github.com/repos/NapNeko/NapCatQQ/releases?per_page=30'
+    )
+    expect(seen[1]).toBe(
+      'https://api.github.com/repos/NapNeko/NapCatQQ/releases?per_page=30'
+    )
+  })
+
+  it('用户自建镜像没写结尾斜杠 → 拼出的 API 地址仍然对（不能粘成一坨）', async () => {
+    addCustomMirror(root, { label: '自建镜像', base: 'https://mirror.example', mode: 'proxy' })
+    const seen: string[] = []
+    const list = await listVersions({
+      dataRoot: root,
+      type: 'n',
+      onlyBase: 'https://mirror.example',
+      fetchJson: async (url) => {
+        seen.push(url)
+        return JSON.stringify([
+          {
+            tag_name: 'v4.18.41',
+            prerelease: false,
+            assets: [
+              {
+                name: 'NapCat.Shell.zip',
+                browser_download_url:
+                  'https://github.com/NapNeko/NapCatQQ/releases/download/v4.18.41/NapCat.Shell.zip',
+                size: 35894640
+              }
+            ]
+          }
+        ])
+      }
+    })
+    expect(seen[0]).toBe(
+      'https://mirror.example/https://api.github.com/repos/NapNeko/NapCatQQ/releases?per_page=30'
+    )
+    expect(list.map((v) => v.tag)).toEqual(['v4.18.41'])
+  })
+
   it('探测全部镜像源并按 tag 去重合并：NapCat 多源合并（这条合并逻辑仍要有效）', async () => {
     /*
      * 原来这条是拿 AstrBot 的 dashboard.zip 验合并的，那个来源已经没有可装版本了。

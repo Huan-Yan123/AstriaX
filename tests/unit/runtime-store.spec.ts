@@ -32,6 +32,32 @@ describe('多版本运行时仓库', () => {
     expect(list[0].installedAt).toBeTruthy()
   })
 
+  it('sourceKey 会持久化并在重建 store 后返回，同 tag 重装可更新来源', () => {
+    const st = createRuntimeStore({ dataRoot: root })
+    st.register({
+      type: 'a',
+      tag: 'v4.28.0',
+      from: '同名源',
+      sourceKey: 'https://pypi.org/simple/'
+    })
+    expect(st.list('a')[0].sourceKey).toBe('https://pypi.org/simple/')
+
+    st.register({
+      type: 'a',
+      tag: 'v4.28.0',
+      from: '同名源',
+      sourceKey: 'https://mirrors.cloud.tencent.com/pypi/simple/'
+    })
+    expect(st.list('a')[0].sourceKey).toBe(
+      'https://mirrors.cloud.tencent.com/pypi/simple/'
+    )
+
+    const reopened = createRuntimeStore({ dataRoot: root })
+    expect(reopened.list('a')[0].sourceKey).toBe(
+      'https://mirrors.cloud.tencent.com/pypi/simple/'
+    )
+  })
+
   it('同 tag 重复登记是幂等的（不产生两条）', () => {
     const st = createRuntimeStore({ dataRoot: root })
     st.register({ type: 'a', tag: 'v4.28.0' })

@@ -258,7 +258,7 @@ onMounted(load)
 }
 .hint {
   color: var(--ink-soft);
-  font-size: 12.5px;
+  font-size:13px;
 }
 .createbtn {
   margin-left: auto;
@@ -275,8 +275,8 @@ onMounted(load)
   border-radius: 6px;
   background: var(--primary-soft);
   color: var(--primary-deep);
-  font-size: 11px;
-  font-weight: 600;
+  font-size:12px;
+  font-weight: var(--fw-bold);
 }
 .card {
   display: grid;
@@ -303,7 +303,7 @@ onMounted(load)
 }
 .meta {
   color: var(--ink-soft);
-  font-size: 12.5px;
+  font-size:13px;
   margin: 0;
 }
 .actions2 {
@@ -340,7 +340,7 @@ onMounted(load)
 .fpath {
   flex: 1;
   min-width: 0;
-  font: 12px/1.5 'JetBrains Mono', Consolas, monospace;
+  font: 12px/1.5 var(--font);
   color: var(--ink);
   /* 路径太长时尾部省略（Windows 路径的关键信息通常在前半段） */
   overflow: hidden;
@@ -370,7 +370,7 @@ onMounted(load)
 }
 .updpath {
   margin: 0 0 10px;
-  font: 11.5px/1.5 'JetBrains Mono', Consolas, monospace;
+  font:12px/1.5 var(--font);
   color: var(--ink-soft);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -391,7 +391,7 @@ onMounted(load)
   font-size: 13px;
 }
 .utime {
-  font: 12.5px/1.5 'JetBrains Mono', Consolas, monospace;
+  font:13px/1.5 var(--font);
   color: var(--ink);
 }
 .usize {
@@ -405,7 +405,7 @@ onMounted(load)
 /* 卡片里的实例子路径：小一号、次要色 */
 .subpath {
   margin: 0;
-  font: 11.5px/1.5 'JetBrains Mono', Consolas, monospace;
+  font:12px/1.5 var(--font);
   color: var(--ink-soft);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -430,9 +430,7 @@ onMounted(load)
   padding: 22px 24px;
   border: 1px solid var(--glass-edge);
   border-radius: 20px;
-  background: linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(242, 247, 255, 0.72));
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
+  background: linear-gradient(145deg, #fff 0%, #f7faff 100%);
   box-shadow: 0 24px 64px rgba(19, 37, 70, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 .dlg.confirm h2 {

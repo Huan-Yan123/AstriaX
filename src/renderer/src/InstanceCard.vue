@@ -353,7 +353,7 @@ header {
 }
 h3 {
   margin: 0;
-  font-size: 15.5px;
+  font-size:16px;
   /*
    * ★ 名字**不再吃剩余空间**（`flex: 0 1 auto`）。
    *
@@ -382,7 +382,7 @@ h3 {
   flex: none;
   border-radius: 999px;
   padding: 2px 10px;
-  font-size: 11px;
+  font-size:12px;
   background: var(--primary-soft);
   color: var(--primary-deep);
 }
@@ -413,7 +413,7 @@ h3 {
  */
 .ver {
   flex: none;
-  font: 11px/1 'JetBrains Mono', Consolas, monospace;
+  font: 12px/1 var(--font);
   color: var(--ink-soft);
   background: var(--card-n);
   border: 1px solid var(--hairline);
@@ -422,7 +422,7 @@ h3 {
   letter-spacing: 0.02em;
 }
 .status {
-  font-size: 12.5px;
+  font-size:13px;
   color: var(--ink);
   margin: 8px 0 0;
   display: flex;

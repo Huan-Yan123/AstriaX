@@ -1,40 +1,17 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
-import { get as httpsGet } from 'https'
-import { get as httpGet } from 'http'
+import { systemFetch } from '../update/network'
 /* 解压 pip wheel 复用既有入口（内部处理了 PowerShell 引号转义） */
 import { expandArchive } from '../util/async-exec'
 
 /** 不受 CORS 约束的取文本（主进程专用；重定向跟随） */
-export function nodeGetText(url: string, depth = 0): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (depth > 5) {
-      reject(new Error('重定向过多'))
-      return
-    }
-    const getter = url.startsWith('https:') ? httpsGet : httpGet
-    const req = getter(url, { headers: { 'User-Agent': 'AstriaX' } }, (res) => {
-      const code = res.statusCode ?? 0
-      if (code >= 300 && code < 400 && res.headers.location) {
-        res.resume()
-        resolve(nodeGetText(new URL(res.headers.location, url).toString(), depth + 1))
-        return
-      }
-      if (code !== 200) {
-        res.resume()
-        reject(new Error(`HTTP ${code}`))
-        return
-      }
-      const chunks: Buffer[] = []
-      res.on('data', (c: Buffer) => chunks.push(c))
-      res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')))
-      res.on('error', reject)
-    })
-    req.on('error', reject)
-    req.setTimeout(60000, () => {
-      req.destroy(new Error('请求超时'))
-    })
+export async function nodeGetText(url: string): Promise<string> {
+  const r = await systemFetch(url, {
+    headers: { 'User-Agent': 'AstriaX' },
+    signal: AbortSignal.timeout(60000)
   })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return await r.text()
 }
 
 /**
@@ -43,35 +20,13 @@ export function nodeGetText(url: string, depth = 0): Promise<string> {
  * 与 nodeGetText 同一套重定向/超时处理，区别只是**不按 utf8 解码** ——
  * wheel/zip 这类二进制按 utf8 读会损坏。
  */
-export function nodeGetBuffer(url: string, depth = 0): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    if (depth > 5) {
-      reject(new Error('重定向过多'))
-      return
-    }
-    const getter = url.startsWith('https:') ? httpsGet : httpGet
-    const req = getter(url, { headers: { 'User-Agent': 'AstriaX' } }, (res) => {
-      const code = res.statusCode ?? 0
-      if (code >= 300 && code < 400 && res.headers.location) {
-        res.resume()
-        resolve(nodeGetBuffer(new URL(res.headers.location, url).toString(), depth + 1))
-        return
-      }
-      if (code !== 200) {
-        res.resume()
-        reject(new Error(`HTTP ${code}`))
-        return
-      }
-      const chunks: Buffer[] = []
-      res.on('data', (c: Buffer) => chunks.push(c))
-      res.on('end', () => resolve(Buffer.concat(chunks)))
-      res.on('error', reject)
-    })
-    req.on('error', reject)
-    req.setTimeout(60000, () => {
-      req.destroy(new Error('请求超时'))
-    })
+export async function nodeGetBuffer(url: string): Promise<Buffer> {
+  const r = await systemFetch(url, {
+    headers: { 'User-Agent': 'AstriaX' },
+    signal: AbortSignal.timeout(60000)
   })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return Buffer.from(await r.arrayBuffer())
 }
 
 /** 内置 Python 版本：与 AstrBot 的 .python-version 对齐 */
@@ -397,7 +352,7 @@ export async function ensurePip(deps: {
 
   const write = deps.writeFile ?? ((p: string, c: string) => writeFileSync(p, c, 'utf8'))
   const writeBin = deps.writeBinary ?? ((p: string, b: Buffer) => writeFileSync(p, b))
-  // get-pip.py 用 Node https 取：主进程里 fetch 受 CSP/CORS 影响（渲染层同款环境），https 模块不受限
+  // 取 get-pip.py / pip wheel 统一走 systemFetch（Electron net.fetch）：主进程无 CORS 限制，且跟随系统代理
   const fetcher = deps.fetchText ?? ((url: string) => nodeGetText(url))
   const fetcherBin = deps.fetchBinary ?? ((url: string) => nodeGetBuffer(url))
   const extractZip =

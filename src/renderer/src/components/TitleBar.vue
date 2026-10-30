@@ -134,7 +134,7 @@ onUnmounted(() => {
 
 .titlebar__title {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: var(--fw-medium);
   color: var(--primary-deep, #1e4388);
   letter-spacing: 0.01em;
 }
